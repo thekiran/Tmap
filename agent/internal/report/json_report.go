@@ -29,6 +29,7 @@ func roundScanResult(r models.ScanResult) models.ScanResult {
 	r.Confidence = round2(r.Confidence)
 	r.ClassificationConfidence = round2(r.ClassificationConfidence)
 	r.ContextConfidence = round2(r.ContextConfidence)
+	r.Classification.Confidence = round2(r.Classification.Confidence)
 	r.ConfidenceBreakdown.Classification = round2(r.ConfidenceBreakdown.Classification)
 	r.ConfidenceBreakdown.Context = round2(r.ConfidenceBreakdown.Context)
 	r.ConfidenceBreakdown.Physical = round2(r.ConfidenceBreakdown.Physical)
@@ -37,6 +38,7 @@ func roundScanResult(r models.ScanResult) models.ScanResult {
 	r.ConfidenceBreakdown.Performance = round2(r.ConfidenceBreakdown.Performance)
 	r.ConfidenceBreakdown.Regional = round2(r.ConfidenceBreakdown.Regional)
 	r.ConfidenceBreakdown.Penalty = round2(r.ConfidenceBreakdown.Penalty)
+	roundEvidenceTiers(&r.EvidenceTiers)
 	if r.Scores != nil {
 		scores := make(map[string]float64, len(r.Scores))
 		for k, v := range r.Scores {
@@ -52,6 +54,7 @@ func roundScanResult(r models.ScanResult) models.ScanResult {
 	for i := range r.Candidates {
 		r.Candidates[i].Score = round2(r.Candidates[i].Score)
 		r.Candidates[i].Confidence = round2(r.Candidates[i].Confidence)
+		roundEvidenceItems(r.Candidates[i].SupportingEvidence)
 	}
 	r.ScoreContributions = append([]models.ScoreContribution(nil), r.ScoreContributions...)
 	for i := range r.ScoreContributions {
@@ -117,6 +120,25 @@ func roundScanResult(r models.ScanResult) models.ScanResult {
 		r.DetectedNetworkContext = &nc
 	}
 	return r
+}
+
+func roundEvidenceTiers(t *models.EvidenceTiers) {
+	t.DirectPhysical.Confidence = round2(t.DirectPhysical.Confidence)
+	t.DeviceModel.Confidence = round2(t.DeviceModel.Confidence)
+	t.Topology.Confidence = round2(t.Topology.Confidence)
+	t.Performance.Confidence = round2(t.Performance.Confidence)
+	t.Regional.Confidence = round2(t.Regional.Confidence)
+	roundEvidenceItems(t.DirectPhysical.Items)
+	roundEvidenceItems(t.DeviceModel.Items)
+	roundEvidenceItems(t.Topology.Items)
+	roundEvidenceItems(t.Performance.Items)
+	roundEvidenceItems(t.Regional.Items)
+}
+
+func roundEvidenceItems(items []models.EvidenceItem) {
+	for i := range items {
+		items[i].Confidence = round2(items[i].Confidence)
+	}
 }
 
 func round2(v float64) float64 {

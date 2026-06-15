@@ -41,9 +41,9 @@ type gatewayChainFuncs struct {
 }
 
 type gatewayHTTPResult struct {
-	Title  string
-	Server string
-	Body   string
+	Title       string
+	Server      string
+	Body        string
 	FaviconHash string
 }
 
@@ -283,9 +283,9 @@ func fetchGatewayHTTP(ctx context.Context, endpoint string) (gatewayHTTPResult, 
 	}
 	text := string(body)
 	return gatewayHTTPResult{
-		Title:  extractTitle(text),
-		Server: resp.Header.Get("Server"),
-		Body:   text,
+		Title:       extractTitle(text),
+		Server:      resp.Header.Get("Server"),
+		Body:        text,
 		FaviconHash: fetchFaviconHash(ctx, client, endpoint),
 	}, nil
 }
@@ -401,6 +401,7 @@ func inferAccessHints(text string) []string {
 		{[]string{"gpon"}, models.TypeGPON},
 		{[]string{"docsis", "cable modem", "eurodocsis", "arris", "technicolor"}, models.TypeCable},
 		{[]string{"lte", "4g", "5g", "nr5g", "cpe lte", "wwan", "cellular"}, models.TypeMobile},
+		{[]string{"wan ethernet", "ethernet wan", "wanaccesstype ethernet"}, models.TypeEthernetWAN},
 	} {
 		for _, token := range c.tokens {
 			if strings.Contains(l, token) {

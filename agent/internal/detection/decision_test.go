@@ -63,29 +63,35 @@ func TestShouldReturnUnknown_StrongEvidenceCommits(t *testing.T) {
 }
 
 func TestDecisionQuality(t *testing.T) {
-	if got := decisionQuality(0.9, 0.5, 0.9, true); got != "high" {
+	if got := decisionQuality(0.9, 0.5, 0.9, true, true); got != "high" {
 		t.Errorf("strong/clear case = %q, want high", got)
 	}
-	if got := decisionQuality(0.6, 0.2, 0.5, false); got != "low" {
+	if got := decisionQuality(0.6, 0.2, 0.5, false, false); got != "low" {
 		t.Errorf("solid-margin without strong evidence = %q, want low", got)
 	}
-	if got := decisionQuality(0.6, 0.2, 0.5, true); got != "medium" {
+	if got := decisionQuality(0.6, 0.2, 0.5, true, false); got != "medium" {
 		t.Errorf("solid-margin with strong evidence = %q, want medium", got)
 	}
-	if got := decisionQuality(0.25, 0.03, 0.25, false); got != "low" {
+	if got := decisionQuality(0.6, 0.2, 0.5, false, true); got != "medium" {
+		t.Errorf("model evidence with solid margin = %q, want medium", got)
+	}
+	if got := decisionQuality(0.25, 0.03, 0.25, false, false); got != "low" {
 		t.Errorf("weak case = %q, want low", got)
 	}
 }
 
 func TestHasStrongPhysicalEvidence(t *testing.T) {
-	if !hasStrongPhysicalEvidence(evidenceBag{}, true) {
-		t.Error("fingerprint match must count as strong")
+	if hasStrongPhysicalEvidence(evidenceBag{}, true) {
+		t.Error("fingerprint match must not count as direct physical evidence")
 	}
-	if !hasStrongPhysicalEvidence(evidenceBag{Text: "Huawei HG8245H GPON ONT"}, false) {
-		t.Error("GPON/ONT marker must count as strong")
+	if !hasStrongPhysicalEvidence(evidenceBag{WANSignalText: "Device.Optical.Interface GPON ONT"}, false) {
+		t.Error("GPON/ONT marker from WAN signal text must count as strong")
 	}
 	if hasStrongPhysicalEvidence(weakBag(), false) {
 		t.Error("PTR/ASN alone must NOT count as strong")
+	}
+	if !hasDeviceModelEvidence(evidenceBag{}, true) {
+		t.Error("fingerprint match must count as Tier B model evidence")
 	}
 }
 

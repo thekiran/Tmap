@@ -85,6 +85,39 @@ func (n *Normalizer) Device(ctx context.Context, ip string, alive bool, openPort
 	return d
 }
 
+// attachNmap enriches a device with Nmap host/service data: it records an nmap
+// evidence entry, merges open services (deduped by port+protocol), and fills in a
+// hostname when reverse DNS did not provide one.
+func (n *Normalizer) attachNmap(d *models.Device, s ScannedHost) {
+	evID := n.Store.Add(topology.EvidenceNmap, "nmap",
+		fmt.Sprintf("Nmap reported %d open service(s) on %s.", len(s.Services), s.IP),
+		map[string]string{"ip": s.IP, "services": itoa(len(s.Services))})
+
+	existing := map[string]bool{}
+	for _, sv := range d.Services {
+		existing[sv.Protocol+":"+itoa(sv.Port)] = true
+	}
+	for _, sv := range s.Services {
+		key := sv.Protocol + ":" + itoa(sv.Port)
+		if existing[key] {
+			continue
+		}
+		existing[key] = true
+		sv.EvidenceIDs = append(sv.EvidenceIDs, evID)
+		d.Services = append(d.Services, sv)
+	}
+	sort.Slice(d.Services, func(i, j int) bool {
+		if d.Services[i].Port != d.Services[j].Port {
+			return d.Services[i].Port < d.Services[j].Port
+		}
+		return d.Services[i].Protocol < d.Services[j].Protocol
+	})
+	if d.Hostname == "" && s.Hostname != "" {
+		d.Hostname = s.Hostname
+	}
+	d.EvidenceIDs = sortedUnique(append(d.EvidenceIDs, evID))
+}
+
 func ipAddress(ip string) models.IPAddress {
 	v := 4
 	if isIPv6(ip) {

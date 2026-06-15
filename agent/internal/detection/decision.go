@@ -7,15 +7,14 @@ import (
 	"github.com/thekiran/iad/pkg/models"
 )
 
-// Decision thresholds. These encode the project's core stance: this is
-// probabilistic, evidence-based analysis — not certain detection. When the
-// evidence is weak, contested, or lacks anything that physically proves the
-// access type, the verdict is Unknown (but the candidate scores are kept).
+// Decision thresholds. The classifier is allowed to show a probable/possible
+// result from model evidence, but only Tier A direct physical evidence can become
+// a final confirmed result.
 const (
-	minConfidence   = 0.45 // below this → Unknown
-	minTopScore     = 0.35 // top category score below this → Unknown
-	minCategoryGap  = 0.12 // category margin below this → Unknown (too close)
-	highConfidence  = 0.70
+	minConfidence   = 0.40 // below this -> Unknown
+	minTopScore     = 0.35 // top category score below this -> Unknown
+	minCategoryGap  = 0.12 // category margin below this -> Unknown unless Tier A resolves it
+	highConfidence  = 0.85
 	highTopScore    = 0.60
 	highCategoryGap = 0.20
 )
@@ -45,16 +44,14 @@ func topTwo(m map[string]float64) CandidatePair {
 	return p
 }
 
-// topTwoScores returns the leading pair of raw type scores (helper from the spec).
+// topTwoScores returns the leading pair of raw type scores.
 func topTwoScores(scores map[string]float64) CandidatePair {
 	return topTwo(scores)
 }
 
 // categoryScores collapses per-type scores to per-category scores using the max
-// type score in each category. This is what the decision layer compares, so that
-// two types in the *same* category (e.g. DSL vs VDSL) being close does not look
-// like ambiguity — only competition *between* categories (DSL vs Fiber vs Cable)
-// counts as a close, uncertain race.
+// type score in each category. This prevents DSL vs VDSL subtype closeness from
+// looking like cross-medium ambiguity.
 func categoryScores(scores map[string]float64) map[string]float64 {
 	cat := map[string]float64{}
 	for t, s := range scores {
@@ -110,32 +107,26 @@ func collapseParentSubtypeCandidates(ranked []models.TypeScore) []models.TypeSco
 	return out
 }
 
-// strongEvidenceTokens are substrings that, if present in the evidence text or a
-// (router-side) interface name, prove the physical access medium.
-var strongEvidenceTokens = []string{
+var directEvidenceTokens = []string{
 	"ptm0", "atm0", "dsl0", "pppoe-wan", "eth-wan", "gpon", "epon", "ont",
 	"docsis", "cable modem", "vdsl2", "adsl2+", "line rate", "line attenuation",
-	"snr margin", "wwan", "lte0",
-}
-
-var gatewayStrongEvidenceTokens = []string{
-	"vdsl", "adsl", "dsl", "ptm", "atm", "gpon", "epon", "ont", "docsis",
-	"cable modem", "lte", "5g cpe", "wan dsl", "wan gpon",
+	"snr margin", "wwan", "lte0", "wan dsl", "wan gpon", "wan ethernet",
+	"wandslinterfaceconfig", "dsl.line", "dsl.channel", "ptm.link", "atm.link",
+	"optical.interface", "cellular.interface", "vdsl2-line", "adsl-line",
+	"docs-if", "docsis mib", "iftype adsl",
 }
 
 // genericServerTokens are HTTP Server-header values that identify only the web
-// stack, never the physical access type. They must never produce an access hint
-// on their own (spec §A, §B).
+// stack, never the physical access type.
 var genericServerTokens = []string{
 	"nginx", "apache", "lighttpd", "openresty", "caddy", "go", "microsoft-iis",
 }
 
-// hasStrongPhysicalEvidence reports whether anything in the evidence actually
-// proves the access type. A modem fingerprint match counts; so do WAN-side
-// interface names and DSL/GPON/DOCSIS markers. PTR, ASN, public IP, latency and
-// local Ethernet/Wi-Fi names do NOT — they are weak/contextual only.
-func hasStrongPhysicalEvidence(bag evidenceBag, matched bool) bool {
-	if matched {
+// hasDirectPhysicalEvidence reports Tier A evidence only. Known model names,
+// PTR/ASN, public IP, latency, and local Ethernet/Wi-Fi adapter names are not
+// direct proof of the WAN access medium.
+func hasDirectPhysicalEvidence(bag evidenceBag) bool {
+	if bag.LineProfile != nil && bag.LineProfile.Confidence > 0 {
 		return true
 	}
 	if bag.PhysicalEvidence > 0 {
@@ -149,35 +140,42 @@ func hasStrongPhysicalEvidence(bag evidenceBag, matched bool) bool {
 			return true
 		}
 	}
-	text := strings.ToLower(bag.Text)
-	for _, tok := range strongEvidenceTokens {
+	text := strings.ToLower(strings.TrimSpace(bag.WANSignalText + " " + bag.CPEText))
+	for _, tok := range directEvidenceTokens {
 		if strings.Contains(text, tok) {
 			return true
 		}
 	}
-	gatewayText := strings.ToLower(bag.GatewayDeviceText)
-	for _, tok := range gatewayStrongEvidenceTokens {
-		if strings.Contains(gatewayText, tok) {
-			return true
-		}
+	return false
+}
+
+// hasStrongPhysicalEvidence is retained for older call sites. In the new model,
+// "strong physical" means Tier A direct physical WAN evidence only.
+func hasStrongPhysicalEvidence(bag evidenceBag, matched bool) bool {
+	return hasDirectPhysicalEvidence(bag)
+}
+
+func hasDeviceModelEvidence(bag evidenceBag, matched bool) bool {
+	if matched {
+		return true
 	}
-	for _, ifc := range bag.Interfaces {
-		l := strings.ToLower(ifc)
-		for _, tok := range strongEvidenceTokens {
-			if strings.Contains(l, tok) {
-				return true
-			}
+	if strings.TrimSpace(bag.RouterModel) != "" && bag.DeviceEvidence > 0 {
+		return true
+	}
+	for _, d := range bag.GatewayDevices {
+		if (d.Model != "" || d.Manufacturer != "" || d.FingerprintID != "") && d.DeviceConfidence >= 0.40 {
+			return true
 		}
 	}
 	return false
 }
 
 // shouldReturnUnknown applies the decision gate. It returns whether the verdict
-// must be downgraded to Unknown, plus the human-readable reasons (which always
-// reflect every condition that contributed, for explainability).
+// must be downgraded to Unknown, plus human-readable reasons.
 func shouldReturnUnknown(scores map[string]float64, confidence float64, bag evidenceBag, matched bool) (bool, []string) {
 	cat := topTwo(categoryScores(scores))
-	strong := hasStrongPhysicalEvidence(bag, matched)
+	direct := hasDirectPhysicalEvidence(bag)
+	device := hasDeviceModelEvidence(bag, matched)
 
 	var reasons []string
 	if confidence < minConfidence {
@@ -186,38 +184,37 @@ func shouldReturnUnknown(scores map[string]float64, confidence float64, bag evid
 	if cat.FirstScore < minTopScore {
 		reasons = append(reasons, "The top score is low.")
 	}
-	if cat.Margin < minCategoryGap {
+	if cat.Margin < minCategoryGap && !direct {
 		reasons = append(reasons, "The leading category scores are too close to call.")
 	}
-	if !strong {
+	if !direct {
 		reasons = append(reasons, "No strong physical-layer evidence of the access type was found.")
+	}
+	if !direct && !device {
+		reasons = append(reasons, "Only topology, performance, or operator hints were available.")
 	}
 	if !matched && !bag.UPnPFound {
 		reasons = append(reasons, "No UPnP modem model was discovered.")
 	}
-	if bag.PTR != "" && !strong {
+	if bag.PTR != "" && !direct {
 		reasons = append(reasons, "The PTR record is not conclusive evidence of the access type.")
 	}
 
 	unknown := confidence < minConfidence ||
 		cat.FirstScore < minTopScore ||
-		cat.Margin < minCategoryGap ||
-		!strong
+		(cat.Margin < minCategoryGap && !direct) ||
+		(!direct && !device)
 
 	return unknown, reasons
 }
 
-// decisionQuality grades the verdict's trustworthiness. Strong physical evidence
-// with high confidence and a clear lead is "high"; strong evidence OR a solid
-// statistical margin is "medium"; everything else is "low".
-func decisionQuality(confidence, margin, topScore float64, strong bool) string {
-	if !strong {
-		return "low"
-	}
-	if strong && confidence >= highConfidence && topScore >= highTopScore && margin >= highCategoryGap {
+// decisionQuality grades the verdict's trustworthiness. Only direct physical
+// evidence can be high quality; strong model evidence tops out at medium.
+func decisionQuality(confidence, margin, topScore float64, direct, device bool) string {
+	if direct && confidence >= highConfidence && topScore >= highTopScore && margin >= highCategoryGap {
 		return "high"
 	}
-	if confidence >= minConfidence && margin >= minCategoryGap && topScore >= minTopScore {
+	if (direct || device) && confidence >= minConfidence && margin >= minCategoryGap && topScore >= minTopScore {
 		return "medium"
 	}
 	return "low"

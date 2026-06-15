@@ -26,11 +26,14 @@ func TestUPnPIGDDeepWANAccessTypeDSLProducesPhysicalEvidence(t *testing.T) {
 	}
 }
 
-func TestUPnPIGDDeepGenericIGDDoesNotClassify(t *testing.T) {
+func TestUPnPIGDDeepEthernetWANDoesNotClassifyAsFiber(t *testing.T) {
 	p := fakeUPnPIGDDeepProbe(map[string]string{"NewWANAccessType": "Ethernet", "NewPhysicalLinkStatus": "Up"})
 	res, _ := p.Run(context.Background(), models.ScanInput{Mode: models.ModeDeep})
-	if len(res.Hints) != 0 {
-		t.Fatalf("hints = %v, want empty for generic Ethernet", res.Hints)
+	if !containsString(res.Hints, models.TypeEthernetWAN) {
+		t.Fatalf("hints = %v, want EthernetWAN", res.Hints)
+	}
+	if containsString(res.Hints, models.TypeFiber) {
+		t.Fatalf("Ethernet WAN must not imply Fiber: %v", res.Hints)
 	}
 }
 

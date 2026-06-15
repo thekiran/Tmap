@@ -16,19 +16,19 @@ const (
 	TypeSHDSL = "SHDSL"
 
 	// Fiber family
-	TypeFiber         = "Fiber"
-	TypeFTTH          = "FTTH"
-	TypeFTTB          = "FTTB"
-	TypeFTTC          = "FTTC"
-	TypeFTTN          = "FTTN"
-	TypeFTTP          = "FTTP"
-	TypeGPON          = "GPON"
-	TypeEPON          = "EPON"
-	TypeXGPON         = "XG-PON"
-	TypeXGSPON        = "XGS-PON"
-	TypeTenGEPON      = "10G-EPON"
+	TypeFiber          = "Fiber"
+	TypeFTTH           = "FTTH"
+	TypeFTTB           = "FTTB"
+	TypeFTTC           = "FTTC"
+	TypeFTTN           = "FTTN"
+	TypeFTTP           = "FTTP"
+	TypeGPON           = "GPON"
+	TypeEPON           = "EPON"
+	TypeXGPON          = "XG-PON"
+	TypeXGSPON         = "XGS-PON"
+	TypeTenGEPON       = "10G-EPON"
 	TypeActiveEthernet = "Active Ethernet"
-	TypeEthernetWAN   = "Ethernet WAN"
+	TypeEthernetWAN    = "EthernetWAN"
 
 	// Cable family
 	TypeCable      = "Cable"
@@ -44,42 +44,43 @@ const (
 	TypePMPWireless   = "Point-to-Multipoint Wireless"
 
 	// Mobile / fixed-wireless-access
-	TypeMobile = "Mobile"
+	TypeMobile   = "Mobile"
 	TypeCellular = "Cellular"
-	TypeFWA    = "FWA"
-	TypeFWA5G  = "5G FWA"
-	TypeLTE    = "LTE"
-	TypeNR5G   = "5G"
-	TypeWWAN   = "WWAN"
+	TypeFWA      = "FWA"
+	TypeFWA5G    = "5G FWA"
+	TypeLTE      = "LTE"
+	TypeNR5G     = "5G"
+	TypeWWAN     = "WWAN"
 
 	// Satellite
-	TypeSatellite = "Satellite"
+	TypeSatellite    = "Satellite"
 	TypeLEOSatellite = "LEO Satellite"
 	TypeGEOSatellite = "GEO Satellite"
 	TypeMEOSatellite = "MEO Satellite"
-	TypeVSAT = "VSAT"
+	TypeVSAT         = "VSAT"
 
 	// Enterprise
-	TypeEnterprise = "Enterprise"
-	TypeEthernet = "Ethernet"
+	TypeEnterprise    = "Enterprise"
+	TypeEthernet      = "Ethernet"
 	TypeMetroEthernet = "Metro Ethernet"
-	TypeDIA = "DIA"
-	TypeMPLS = "MPLS"
-	TypeLeasedLine = "Leased Line"
-	TypePublicWiFi = "Public Wi-Fi"
-	TypeVPNOverlay = "VPN / Overlay Network"
+	TypeDIA           = "DIA"
+	TypeMPLS          = "MPLS"
+	TypeLeasedLine    = "Leased Line"
+	TypePublicWiFi    = "Public Wi-Fi"
+	TypeVPNOverlay    = "VPN / Overlay Network"
 )
 
 // Access categories (the coarse grouping shown next to the primary verdict).
 const (
-	CatDSL        = "DSL"
-	CatFiber      = "Fiber"
-	CatCable      = "Cable"
-	CatWireless   = "Fixed Wireless"
-	CatMobile     = "Mobile"
-	CatSatellite  = "Satellite"
-	CatEnterprise = "Enterprise"
-	CatUnknown    = "Unknown"
+	CatDSL         = "DSL"
+	CatFiber       = "Fiber"
+	CatCable       = "Cable"
+	CatWireless    = "Fixed Wireless"
+	CatMobile      = "Mobile"
+	CatSatellite   = "Satellite"
+	CatEthernetWAN = "EthernetWAN"
+	CatEnterprise  = "Enterprise"
+	CatUnknown     = "Unknown"
 )
 
 // categoryByType maps every scoreable type key to its category. Category-level
@@ -87,7 +88,7 @@ const (
 // category even when only a coarse verdict was reached.
 var categoryByType = map[string]string{
 	TypeDSL: CatDSL, TypeADSL: CatDSL, TypeADSL2: CatDSL, TypeVDSL: CatDSL, TypeVDSL2: CatDSL, TypeGfast: CatDSL, TypeSDSL: CatDSL, TypeSHDSL: CatDSL,
-	TypeFiber: CatFiber, TypeFTTH: CatFiber, TypeFTTB: CatFiber, TypeFTTC: CatFiber, TypeFTTN: CatFiber, TypeFTTP: CatFiber, TypeGPON: CatFiber, TypeEPON: CatFiber, TypeXGPON: CatFiber, TypeXGSPON: CatFiber, TypeTenGEPON: CatFiber, TypeActiveEthernet: CatFiber, TypeEthernetWAN: CatFiber,
+	TypeFiber: CatFiber, TypeFTTH: CatFiber, TypeFTTB: CatFiber, TypeFTTC: CatFiber, TypeFTTN: CatFiber, TypeFTTP: CatFiber, TypeGPON: CatFiber, TypeEPON: CatFiber, TypeXGPON: CatFiber, TypeXGSPON: CatFiber, TypeTenGEPON: CatFiber, TypeActiveEthernet: CatFiber, TypeEthernetWAN: CatEthernetWAN,
 	TypeCable: CatCable, TypeDOCSIS: CatCable, TypeEuroDOCSIS: CatCable, TypeHFC: CatCable,
 	// Cellular FWA (4G/5G home internet) is delivered over the mobile radio
 	// network, so it shares the Mobile category. Only genuinely non-cellular fixed

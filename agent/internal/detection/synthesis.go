@@ -164,20 +164,28 @@ func ruleEvidenceClass(id string) (class, strength string) {
 // score is expressed as category=Fiber, type=FTTH, subtype=GPON rather than as
 // separate competing entries.
 var subtypeParent = map[string]string{
-	models.TypeGPON: models.TypeFTTH,
-	"EPON":          models.TypeFTTH,
-	"XG-PON":        models.TypeFTTH,
-	"XGS-PON":       models.TypeFTTH,
-	"10G-EPON":      models.TypeFTTH,
-	models.TypeVDSL2: models.TypeVDSL,
-	models.TypeADSL2: models.TypeADSL,
-	"ADSL2":          models.TypeADSL,
+	models.TypeGPON:   models.TypeFTTH,
+	"EPON":            models.TypeFTTH,
+	"XG-PON":          models.TypeFTTH,
+	"XGS-PON":         models.TypeFTTH,
+	"10G-EPON":        models.TypeFTTH,
+	models.TypeVDSL2:  models.TypeVDSL,
+	models.TypeADSL2:  models.TypeADSL,
+	"ADSL2":           models.TypeADSL,
 	models.TypeDOCSIS: models.TypeCable,
 }
 
 // buildCandidates groups scores by category and emits one candidate per
 // category (no parent/subtype duplication), highest score first.
-func buildCandidates(scores map[string]float64, physicalStrength string) []models.AccessCandidate {
+func buildCandidates(scores map[string]float64, bag evidenceBag, matched bool) []models.AccessCandidate {
+	tiers := buildEvidenceTiers(bag, matched)
+	strength := tiers.DirectPhysical.Strength
+	if strength == "none" {
+		strength = tiers.DeviceModel.Strength
+	}
+	if strength == "none" {
+		strength = "weak"
+	}
 	byCat := map[string][]models.TypeScore{}
 	for t, s := range scores {
 		if s <= 0 {
@@ -198,7 +206,7 @@ func buildCandidates(scores map[string]float64, physicalStrength string) []model
 			}
 			return list[i].Type < list[j].Type
 		})
-		cand := models.AccessCandidate{Category: cat, Score: list[0].Score, EvidenceStrength: physicalStrength}
+		cand := models.AccessCandidate{Category: cat, Score: list[0].Score, Confidence: list[0].Score, EvidenceStrength: strength}
 		// Pick the most specific subtype present; its parent becomes the type.
 		for _, ts := range list {
 			if parent, ok := subtypeParent[ts.Type]; ok {
@@ -215,6 +223,8 @@ func buildCandidates(scores map[string]float64, physicalStrength string) []model
 				cand.Type = list[1].Type
 			}
 		}
+		cand.SupportingEvidence = candidateSupportingEvidence(tiers)
+		cand.MissingEvidence = candidateMissingEvidence(cand, tiers)
 		out = append(out, cand)
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -262,5 +272,78 @@ func buildEvidenceStrengthSummary(bag evidenceBag, matched bool) *models.Evidenc
 		Network:     strengthLabel(bag.NetworkEvidence),
 		Performance: strengthLabel(bag.PerformanceEvidence),
 		Regional:    strengthLabel(regional),
+	}
+}
+
+func candidateSupportingEvidence(tiers models.EvidenceTiers) []models.EvidenceItem {
+	var out []models.EvidenceItem
+	if tiers.DirectPhysical.Present {
+		out = append(out, tiers.DirectPhysical.Items...)
+	}
+	if tiers.DeviceModel.Present {
+		out = append(out, tiers.DeviceModel.Items...)
+	}
+	if tiers.Topology.Present {
+		out = append(out, tiers.Topology.Items...)
+	}
+	if tiers.Performance.Present {
+		out = append(out, tiers.Performance.Items...)
+	}
+	if tiers.Regional.Present {
+		out = append(out, tiers.Regional.Items...)
+	}
+	return out
+}
+
+func candidateMissingEvidence(cand models.AccessCandidate, tiers models.EvidenceTiers) []string {
+	if tiers.DirectPhysical.Present {
+		return nil
+	}
+	switch cand.Type {
+	case models.TypeFiber, models.TypeFTTH:
+		return []string{
+			"No optical interface evidence.",
+			"No ONT/GPON/EPON/XGS-PON model with active optical WAN.",
+			"No UPnP WANAccessType proving optical access.",
+			"No TR-064 WAN optical data.",
+			"No SNMP optical interface evidence.",
+		}
+	case models.TypeVDSL:
+		return []string{
+			"No DSL.Line evidence.",
+			"No PTM/ATM evidence.",
+			"No VDSL2-LINE-MIB evidence.",
+			"No TR-064 DSL service data.",
+			"No active DSL CPE interface detected.",
+		}
+	case models.TypeADSL:
+		return []string{
+			"No ADSL-LINE-MIB evidence.",
+			"No ifType adsl(94) evidence.",
+			"No TR-181 ADSL/ADSL2/ADSL2+ mode evidence.",
+			"No TR-064 DSL service data.",
+		}
+	case models.TypeCable:
+		return []string{
+			"No DOCSIS MIB evidence.",
+			"No docsCable interface evidence.",
+			"No active cable WAN interface evidence.",
+		}
+	case models.TypeFWA, models.TypeMobile:
+		return []string{
+			"No LTE/NR/WWAN CPE interface evidence.",
+			"No active cellular WAN metadata.",
+		}
+	case models.TypeEthernetWAN:
+		return []string{
+			"No explicit WANAccessType Ethernet evidence.",
+			"No TR-181 Ethernet physical WAN stack evidence.",
+		}
+	default:
+		return []string{
+			"No direct physical WAN evidence.",
+			"No mapped CPE model evidence.",
+			"No TR-181/TR-064/SNMP/UPnP WAN physical-layer evidence.",
+		}
 	}
 }

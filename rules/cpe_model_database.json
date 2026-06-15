@@ -1,0 +1,68 @@
+{
+  "schema": "iad.cpe-model-database/v1",
+  "devices": [
+    {
+      "vendor": "Zyxel",
+      "model_patterns": ["VMG*", "VMG3312*", "VMG3625*"],
+      "device_role": "dsl_modem_router",
+      "supported_wan_types": ["VDSL2", "ADSL2+", "EthernetWAN"],
+      "default_confidence": 0.72,
+      "evidence_notes": "Model family is a DSL-capable modem/router.",
+      "ambiguity_notes": "May be used behind a fiber ONT as an Ethernet router; model alone does not prove the active WAN."
+    },
+    {
+      "vendor": "TP-Link",
+      "model_patterns": ["Archer VR400*", "Archer VR600*"],
+      "device_role": "dsl_modem_router",
+      "supported_wan_types": ["VDSL2", "ADSL2+", "EthernetWAN"],
+      "default_confidence": 0.72,
+      "evidence_notes": "VR series models are DSL-capable modem/routers.",
+      "ambiguity_notes": "The Ethernet WAN port can be used behind another CPE; require DSL/PTM/ATM evidence to confirm VDSL/ADSL."
+    },
+    {
+      "vendor": "Huawei",
+      "model_patterns": ["HG8245*", "HG8010*", "EchoLife HG*"],
+      "device_role": "ont_router",
+      "supported_wan_types": ["GPON", "Fiber"],
+      "default_confidence": 0.82,
+      "evidence_notes": "Known GPON ONT/router family.",
+      "ambiguity_notes": "Model evidence is strong but optical interface state or PON telemetry is required for final confirmation."
+    },
+    {
+      "vendor": "Nokia",
+      "model_patterns": ["G-240W*", "G-2425G*"],
+      "device_role": "ont_router",
+      "supported_wan_types": ["GPON", "Fiber"],
+      "default_confidence": 0.82,
+      "evidence_notes": "Known GPON ONT/router family.",
+      "ambiguity_notes": "Confirm with optical/PON interface evidence when possible."
+    },
+    {
+      "vendor": "Technicolor",
+      "model_patterns": ["TC4400*", "CGA*"],
+      "device_role": "cable_modem",
+      "supported_wan_types": ["DOCSIS", "Cable"],
+      "default_confidence": 0.80,
+      "evidence_notes": "Known DOCSIS cable modem/router family.",
+      "ambiguity_notes": "Final confirmation should come from DOCSIS MIB/channel evidence."
+    },
+    {
+      "vendor": "ZTE",
+      "model_patterns": ["MC801*", "MF286*"],
+      "device_role": "cellular_cpe",
+      "supported_wan_types": ["5G", "LTE", "FWA"],
+      "default_confidence": 0.78,
+      "evidence_notes": "Known LTE/5G fixed wireless CPE family.",
+      "ambiguity_notes": "Confirm with LTE/NR/WWAN interface state when locally exposed."
+    },
+    {
+      "vendor": "MikroTik",
+      "model_patterns": ["RouterOS*", "SXT*", "LHG*", "hAP*"],
+      "device_role": "router_or_wireless_cpe",
+      "supported_wan_types": ["WISP", "EthernetWAN", "Fixed Wireless"],
+      "default_confidence": 0.60,
+      "evidence_notes": "May be used as WISP CPE or ordinary Ethernet router.",
+      "ambiguity_notes": "Model alone is ambiguous; require radio bridge/interface evidence for WISP."
+    }
+  ]
+}

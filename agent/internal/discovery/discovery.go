@@ -44,10 +44,10 @@ type Options struct {
 	Sweeper      Sweeper
 	ARPReader    ARPReader
 	Resolver     Resolver
-	Service      ServiceScanner          // optional (Nmap)
-	GatewayFn    func() (net.IP, error)  // default: network.Gateway
+	Service      ServiceScanner         // optional (Nmap)
+	GatewayFn    func() (net.IP, error) // default: network.Gateway
 	DNSFn        func(context.Context) ([]string, error)
-	GatewayChain []string                // optional private gateway chain (gw, upstream, ...) for route_hop edges
+	GatewayChain []string // optional private gateway chain (gw, upstream, ...) for route_hop edges
 	Now          func() time.Time
 }
 
@@ -113,11 +113,11 @@ func Run(ctx context.Context, opts Options) (models.ScanReport, error) {
 	}
 
 	// 4. Host discovery (only meaningful for IPv4 scopes).
-	hits, arpEntries := opts.discover(ctx, scope, store)
+	hits, arpEntries, scanned := opts.discover(ctx, scope)
 
 	// 5. Normalize into devices.
 	norm := &Normalizer{Store: store, Resolver: opts.resolver()}
-	devices, agentDevID, gatewayDevID := buildDevices(ctx, norm, scope, primary, agentIP, gatewayIP, gatewayEvID, hits, arpEntries)
+	devices, agentDevID, gatewayDevID := buildDevices(ctx, norm, primary, agentIP, gatewayIP, gatewayEvID, hits, arpEntries, scanned)
 
 	// 6. Build topology.
 	l2peers := sameSubnetPeers(devices, primary.CIDR, agentDevID, gatewayDevID)
@@ -162,17 +162,21 @@ func Run(ctx context.Context, opts Options) (models.ScanReport, error) {
 	return report, nil
 }
 
-// discover runs the sweep + ARP read (+ optional service scan), recording the
-// liveness evidence implicitly through the normalizer later.
-func (opts Options) discover(ctx context.Context, scope models.ScanScope, store *topology.EvidenceStore) ([]HostHit, []ARPEntry) {
+// discover runs the sweep + ARP read + optional service (Nmap) scan, returning
+// the in-scope observations. Nothing outside the validated scope is returned.
+func (opts Options) discover(ctx context.Context, scope models.ScanScope) ([]HostHit, []ARPEntry, []ScannedHost) {
 	var hits []HostHit
 	if scope.HostCount > 0 { // IPv4, in-range
 		hits, _ = opts.sweeper().Sweep(ctx, scope)
 	}
-	// Optional richer scanner (Nmap) merges/extends liveness.
+	var scanned []ScannedHost
 	if opts.Service != nil && opts.Service.Available() {
-		if scanned, err := opts.Service.Scan(ctx, scope); err == nil {
-			hits = mergeScanned(hits, scanned, store)
+		if hosts, err := opts.Service.Scan(ctx, scope); err == nil {
+			for _, h := range hosts {
+				if InScope(scope, h.IP) {
+					scanned = append(scanned, h)
+				}
+			}
 		}
 	}
 	arpEntries, _ := opts.arpReader().Read(ctx)
@@ -183,12 +187,13 @@ func (opts Options) discover(ctx context.Context, scope models.ScanScope, store 
 			inScope = append(inScope, e)
 		}
 	}
-	return hits, inScope
+	return hits, inScope, scanned
 }
 
 // buildDevices assembles the device list: the agent, the gateway (if known), and
-// every discovered host, deduped by IP and ordered by IP for determinism.
-func buildDevices(ctx context.Context, norm *Normalizer, scope models.ScanScope, primary models.InterfaceInfo, agentIP, gatewayIP, gatewayEvID string, hits []HostHit, arp []ARPEntry) ([]models.Device, string, string) {
+// every discovered host, deduped by IP and ordered by IP for determinism. Nmap
+// data (when present) enriches each device with services, MAC and hostname.
+func buildDevices(ctx context.Context, norm *Normalizer, primary models.InterfaceInfo, agentIP, gatewayIP, gatewayEvID string, hits []HostHit, arp []ARPEntry, scanned []ScannedHost) ([]models.Device, string, string) {
 	macByIP := map[string]string{}
 	for _, e := range arp {
 		macByIP[e.IP] = e.MAC
@@ -197,19 +202,28 @@ func buildDevices(ctx context.Context, norm *Normalizer, scope models.ScanScope,
 	for _, h := range hits {
 		hitByIP[h.IP] = h
 	}
+	scannedByIP := map[string]ScannedHost{}
+	for _, s := range scanned {
+		scannedByIP[s.IP] = s
+	}
 
 	ips := map[string]bool{}
-	if agentIP != "" {
-		ips[agentIP] = true
+	addAll := func(keys ...string) {
+		for _, k := range keys {
+			if k != "" {
+				ips[k] = true
+			}
+		}
 	}
-	if gatewayIP != "" {
-		ips[gatewayIP] = true
-	}
+	addAll(agentIP, gatewayIP)
 	for _, h := range hits {
 		ips[h.IP] = true
 	}
 	for _, e := range arp {
 		ips[e.IP] = true
+	}
+	for _, s := range scanned {
+		ips[s.IP] = true
 	}
 
 	ordered := make([]string, 0, len(ips))
@@ -239,8 +253,16 @@ func buildDevices(ctx context.Context, norm *Normalizer, scope models.ScanScope,
 		if isAgent && mac == "" {
 			mac = primary.MAC
 		}
-		alive := h.Alive || isAgent || isGateway
-		devices = append(devices, norm.Device(ctx, ip, alive, h.OpenPorts, mac, isAgent, isGateway, extra))
+		s, hasScan := scannedByIP[ip]
+		if mac == "" && hasScan {
+			mac = s.MAC
+		}
+		alive := h.Alive || isAgent || isGateway || hasScan
+		d := norm.Device(ctx, ip, alive, h.OpenPorts, mac, isAgent, isGateway, extra)
+		if hasScan {
+			norm.attachNmap(&d, s)
+		}
+		devices = append(devices, d)
 	}
 	return devices, agentDevID, gatewayDevID
 }
@@ -293,25 +315,6 @@ func buildRouteHops(store *topology.EvidenceStore, chain []string, devices []mod
 	}
 	return hops
 }
-
-func mergeScanned(hits []HostHit, scanned []discoveryScannedHostAlias, store *topology.EvidenceStore) []HostHit {
-	byIP := map[string]*HostHit{}
-	out := make([]HostHit, 0, len(hits)+len(scanned))
-	for i := range hits {
-		out = append(out, hits[i])
-		byIP[hits[i].IP] = &out[len(out)-1]
-	}
-	for _, s := range scanned {
-		if _, ok := byIP[s.IP]; ok {
-			continue
-		}
-		out = append(out, HostHit{IP: s.IP, Alive: true})
-	}
-	return out
-}
-
-// discoveryScannedHostAlias keeps mergeScanned readable; it mirrors ScannedHost.
-type discoveryScannedHostAlias = ScannedHost
 
 // ---- option defaults --------------------------------------------------------
 

@@ -151,6 +151,9 @@ func applyWANCommonEvidence(res *models.ProbeResult, source, loc string, values 
 
 	detail := strings.Join([]string{accessType, physical, provider}, " ")
 	hints := wanHintsFromText(detail)
+	if strings.EqualFold(strings.TrimSpace(accessType), "Ethernet") {
+		hints = appendUnique(hints, models.TypeEthernetWAN)
+	}
 	signals := []models.WANSignal{}
 	if strings.TrimSpace(detail) != "" {
 		signals = append(signals, wanSignal(source, locationHost(loc), "wan_common_interface", detail, "UPnP WANCommonInterfaceConfig", hints))

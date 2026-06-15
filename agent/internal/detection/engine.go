@@ -74,25 +74,25 @@ type evidenceBag struct {
 
 	// Raw CPE physical-layer key/values + text gathered from authorized telemetry,
 	// and the LineProfile parsed from them (VDSL2 profile, DOCSIS, PON optical).
-	CPEKV       map[string]string
-	CPEText     string
-	CPESource   string
-	LineProfile *models.LineProfile
-	AccessArchitecture models.AccessArchitecture
-	IPv6Context      *models.IPv6Context
-	NATTopology      *models.NATTopology
-	PerformanceProfile *models.PerformanceProfile
-	PhysicalEvidence float64
-	DeviceEvidence float64
-	NetworkEvidence float64
+	CPEKV               map[string]string
+	CPEText             string
+	CPESource           string
+	LineProfile         *models.LineProfile
+	AccessArchitecture  models.AccessArchitecture
+	IPv6Context         *models.IPv6Context
+	NATTopology         *models.NATTopology
+	PerformanceProfile  *models.PerformanceProfile
+	PhysicalEvidence    float64
+	DeviceEvidence      float64
+	NetworkEvidence     float64
 	PerformanceEvidence float64
-	NormalizedEvidence []evnorm.NormalizedEvidence
+	NormalizedEvidence  []evnorm.NormalizedEvidence
 }
 
 // Analyze runs the full pipeline and returns the verdict plus the raw evidence.
 func (e *Engine) Analyze(in models.ScanInput, results []models.ProbeResult) models.ScanResult {
 	now := time.Now()
-	bag := aggregate(results)
+	bag := mergeProbeResults(results)
 	if len(bag.GatewayChain) == 0 && bag.Gateway != "" {
 		bag.GatewayChain = []string{bag.Gateway}
 	}
@@ -157,6 +157,15 @@ func (e *Engine) Analyze(in models.ScanInput, results []models.ProbeResult) mode
 		DetectedNetworkContext: buildNetworkContext(bag, matched),
 	}
 	result.ConfidenceBreakdown = computeConfidenceBreakdown(scores, bag, matched)
+	result.EvidenceTiers = buildEvidenceTiers(bag, matched)
+	result.Conflicts = detectConflicts(results, bag, scores)
+	if result.Conflicts == nil {
+		result.Conflicts = []models.DataConflict{}
+	}
+	result.DataQuality = models.DataQuality{HasConflicts: len(result.Conflicts) > 0, Conflicts: result.Conflicts}
+	if len(result.Conflicts) > 0 {
+		result.ConfidenceBreakdown.Penalty = maxFloat(result.ConfidenceBreakdown.Penalty, conflictPenalty(result.Conflicts))
+	}
 
 	// Context vs classification split, score audit, candidates, evidence summary
 	// (spec §A.4, §A.5, §C). These are independent of the final verdict.
@@ -165,7 +174,7 @@ func (e *Engine) Analyze(in models.ScanInput, results []models.ProbeResult) mode
 		result.DetectedNetworkContext.EvidenceStrength = summary
 	}
 	result.ScoreContributions = buildContributions(bag, fp, matched, e.Rules, board.Fired())
-	result.Candidates = buildCandidates(scores, summary.Physical)
+	result.Candidates = buildCandidates(scores, bag, matched)
 	ctxConf := contextConfidence(bag)
 	result.ContextConfidence = ctxConf
 	result.ConfidenceBreakdown.Context = ctxConf
@@ -181,36 +190,39 @@ func (e *Engine) Analyze(in models.ScanInput, results []models.ProbeResult) mode
 		result.DecisionQuality = "low"
 		result.UncertaintyReasons = []string{"No scoreable physical access evidence was collected."}
 		result.Explanation = buildUncertainExplanation("", scores, bag, matched, result.UncertaintyReasons)
-		result.NextBestProbes = nextBestProbes(bag, matched)
+		result.NextBestProbes = nextBestProbes(bag, matched, result.Conflicts, scores)
+		populateOutputContract(&result, bag, matched, "")
 		return result
 	}
 
 	leading := ranked[0].Type
-	confidence := computeConfidence(scores, bag.Sources, matched)
+	confidence := computeClassificationConfidence(scores, bag, matched, result.Conflicts)
 
-	strong := hasStrongPhysicalEvidence(bag, matched)
-	// Physical cap: without strong physical evidence the classification confidence
-	// for a physical access type cannot exceed 0.35 (spec §A.4). Network and
-	// performance signals raise context confidence, not classification confidence.
-	if !strong && confidence > 0.35 {
-		confidence = 0.35
-	}
+	direct := hasDirectPhysicalEvidence(bag)
+	device := hasDeviceModelEvidence(bag, matched)
 	result.Confidence = confidence
 	result.ClassificationConfidence = confidence
 	result.ConfidenceBreakdown.Classification = confidence
 	catPair := topTwo(categoryScores(scores))
-	result.DecisionQuality = decisionQuality(confidence, catPair.Margin, catPair.FirstScore, strong)
+	result.DecisionQuality = decisionQuality(confidence, catPair.Margin, catPair.FirstScore, direct, device)
 
 	unknown, reasons := shouldReturnUnknown(scores, confidence, bag, matched)
 	reasons = append(reasons, conflictReasons(scores, bag)...)
+	if hasHighSeverityConflict(result.Conflicts) {
+		reasons = append(reasons, "Conflicting probe results reduced classification confidence.")
+		if !direct || hasWANClassificationConflict(result.Conflicts) {
+			unknown = true
+		}
+	}
 	if unknown {
 		// Keep the candidates visible (including the leader) but do not commit.
 		result.PrimaryType = "Unknown"
 		result.Category = models.CatUnknown
 		result.Alternatives = capN(ranked, 4)
 		result.UncertaintyReasons = reasons
-		result.NextBestProbes = nextBestProbes(bag, matched)
+		result.NextBestProbes = nextBestProbes(bag, matched, result.Conflicts, scores)
 		result.Explanation = buildUncertainExplanation(leading, scores, bag, matched, reasons)
+		populateOutputContract(&result, bag, matched, leading)
 		return result
 	}
 
@@ -218,6 +230,10 @@ func (e *Engine) Analyze(in models.ScanInput, results []models.ProbeResult) mode
 	result.Category = models.CategoryFor(leading)
 	result.Alternatives = capN(ranked[1:], 3)
 	result.Explanation = buildExplanation(leading, bag, fp, matched, board.Fired())
+	if !direct || result.Confidence < highConfidence {
+		result.NextBestProbes = nextBestProbes(bag, matched, result.Conflicts, scores)
+	}
+	populateOutputContract(&result, bag, matched, leading)
 	return result
 }
 
@@ -242,6 +258,13 @@ func applyLatencySignal(board *scoring.Board, bag evidenceBag) {
 	case ms >= 500:
 		board.Add(map[string]float64{models.TypeSatellite: scoring.LatSatellite})
 	}
+}
+
+// mergeProbeResults folds probe results into a single normalized evidence bag.
+// It keeps direct WAN evidence separate from device, topology, performance, and
+// regional context so the classifier can apply hard confidence caps later.
+func mergeProbeResults(results []models.ProbeResult) evidenceBag {
+	return aggregate(results)
 }
 
 // aggregate folds the probe results into a single normalized evidence bag.
@@ -315,16 +338,18 @@ func aggregate(results []models.ProbeResult) evidenceBag {
 				bag.GatewayDeviceText = gatewayDeviceText(bag.GatewayDevices)
 				for _, d := range bag.GatewayDevices {
 					bag.DeviceEvidence = maxFloat(bag.DeviceEvidence, d.DeviceConfidence)
-					if d.AccessConfidence > 0 {
+					if gatewayDeviceHasDirectPhysicalEvidence(d) && d.AccessConfidence > 0 {
 						bag.PhysicalEvidence = maxFloat(bag.PhysicalEvidence, d.AccessConfidence)
-						for _, h := range d.AccessHints {
+						for _, h := range gatewayDevicePhysicalHints(d) {
 							bag.StrongAccessHints = appendUnique(bag.StrongAccessHints, h)
 						}
+					} else if d.AccessConfidence > 0 {
+						bag.DeviceEvidence = maxFloat(bag.DeviceEvidence, d.AccessConfidence)
 					}
 				}
 				contributed = true
 			}
-		case "upnp_igd_probe", "upnp_igd_deep_probe", "upnp_igd_deep_probe_v2", "tr064_probe", "tr064_probe_v2":
+		case "upnp_igd_probe", "upnp_igd_deep_probe", "upnp_igd_deep_probe_v2", "tr064_probe", "tr064_probe_v2", "snmp_probe_opt_in", "tr181_interface_stack_probe":
 			if getBool(r.Evidence, "tr064_found") {
 				bag.TR064Found = true
 			}
@@ -338,7 +363,12 @@ func aggregate(results []models.ProbeResult) evidenceBag {
 				contributed = true
 			}
 			bag.DeviceEvidence = maxFloat(bag.DeviceEvidence, getFloat(r.Evidence, "device_confidence"))
-			bag.PhysicalEvidence = maxFloat(bag.PhysicalEvidence, getFloat(r.Evidence, "access_confidence"))
+			directPhysical := directProbeHasPhysicalEvidence(r)
+			if directPhysical {
+				bag.PhysicalEvidence = maxFloat(bag.PhysicalEvidence, getFloat(r.Evidence, "access_confidence"))
+			} else if getFloat(r.Evidence, "access_confidence") > 0 {
+				bag.DeviceEvidence = maxFloat(bag.DeviceEvidence, getFloat(r.Evidence, "access_confidence"))
+			}
 			if signals := getWANSignals(r.Evidence, "wan_signals"); len(signals) > 0 {
 				bag.WANSignals = append(bag.WANSignals, signals...)
 				bag.WANSignalText = strings.TrimSpace(bag.WANSignalText + " " + wanSignalText(signals))
@@ -359,7 +389,7 @@ func aggregate(results []models.ProbeResult) evidenceBag {
 			if t := getString(r.Evidence, "cpe_text"); t != "" {
 				bag.CPEText = strings.TrimSpace(bag.CPEText + " " + t)
 			}
-			if getBool(r.Evidence, "strong_access_evidence") || getFloat(r.Evidence, "access_confidence") > 0 {
+			if directPhysical && (getBool(r.Evidence, "strong_access_evidence") || getFloat(r.Evidence, "access_confidence") > 0) {
 				for _, h := range r.Hints {
 					bag.StrongAccessHints = appendUnique(bag.StrongAccessHints, h)
 				}
@@ -372,11 +402,13 @@ func aggregate(results []models.ProbeResult) evidenceBag {
 				bag.GatewayDeviceText = strings.TrimSpace(bag.GatewayDeviceText + " " + gatewayDeviceText(devices))
 				for _, d := range devices {
 					bag.DeviceEvidence = maxFloat(bag.DeviceEvidence, d.DeviceConfidence)
-					if d.AccessConfidence > 0 {
+					if gatewayDeviceHasDirectPhysicalEvidence(d) && d.AccessConfidence > 0 {
 						bag.PhysicalEvidence = maxFloat(bag.PhysicalEvidence, d.AccessConfidence)
-						for _, h := range d.AccessHints {
+						for _, h := range gatewayDevicePhysicalHints(d) {
 							bag.StrongAccessHints = appendUnique(bag.StrongAccessHints, h)
 						}
+					} else if d.AccessConfidence > 0 {
+						bag.DeviceEvidence = maxFloat(bag.DeviceEvidence, d.AccessConfidence)
 					}
 				}
 				contributed = true
