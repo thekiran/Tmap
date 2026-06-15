@@ -1,0 +1,118 @@
+# Modem / router fingerprint database (doc §5.2).
+#
+# `match` lists substrings used to identify the device in a discovered model
+# string (case-insensitive); if omitted, `model` is used. A match contributes
+# `access_hints` strongly and `supports` lightly to the score.
+
+devices:
+  - vendor: TP-Link
+    model: Archer VR400
+    category: DSL Modem Router
+    supports: ["ADSL2+", "VDSL2"]
+    access_hints: ["DSL", "VDSL"]
+    match: ["VR400", "Archer VR400"]
+
+  - vendor: TP-Link
+    model: Archer VR600
+    category: DSL Modem Router
+    supports: ["ADSL2+", "VDSL2"]
+    access_hints: ["DSL", "VDSL"]
+    match: ["VR600"]
+
+  - vendor: Huawei
+    model: HG8245H
+    category: GPON ONT
+    supports: ["GPON"]
+    access_hints: ["Fiber", "FTTH", "GPON"]
+    match: ["HG8245"]
+
+  - vendor: Huawei
+    model: EchoLife HG8010
+    category: GPON ONT
+    supports: ["GPON"]
+    access_hints: ["Fiber", "FTTH", "GPON"]
+    match: ["HG8010"]
+
+  - vendor: Arris
+    model: TG2492
+    category: Cable Modem
+    supports: ["DOCSIS 3.0"]
+    access_hints: ["Cable", "DOCSIS"]
+    match: ["TG2492"]
+
+  - vendor: Technicolor
+    model: TC4400
+    category: Cable Modem
+    supports: ["DOCSIS 3.1"]
+    access_hints: ["Cable", "DOCSIS"]
+    match: ["TC4400"]
+
+  - vendor: Huawei
+    model: B535
+    category: LTE Router
+    supports: ["4G", "LTE"]
+    access_hints: ["FWA", "Mobile", "LTE"]
+    match: ["B535"]
+
+  - vendor: ZTE
+    model: MF286
+    category: LTE Router
+    supports: ["4G", "LTE"]
+    access_hints: ["FWA", "Mobile", "LTE"]
+    match: ["MF286"]
+
+  - vendor: ZTE
+    model: ZXHN H168A
+    category: DSL Modem Router
+    supports: ["ADSL2+", "VDSL2"]
+    access_hints: ["DSL", "VDSL"]
+    match: ["H168A", "ZXHN H168"]
+
+  - vendor: Zyxel
+    model: VMG3312 / VMG3625
+    category: DSL Modem Router
+    supports: ["ADSL2+", "VDSL2"]
+    access_hints: ["DSL", "VDSL"]
+    match: ["VMG3312", "VMG3625", "VMG3625-T50B", "VMG3312-B10B"]
+
+  - vendor: MikroTik
+    model: hAP / CPE (RouterOS)
+    category: Wireless CPE / Router
+    supports: ["Ethernet", "Wireless"]
+    access_hints: ["WISP"]
+    match: ["MikroTik", "RouterOS"]
+
+  - vendor: Nokia
+    model: G-240W / G-2425G
+    category: GPON ONT
+    supports: ["GPON"]
+    access_hints: ["Fiber", "FTTH", "GPON"]
+    match: ["G-240W", "G-2425G", "Nokia ONT"]
+
+  - vendor: FiberHome
+    model: AN5506
+    category: GPON ONT
+    supports: ["GPON"]
+    access_hints: ["Fiber", "FTTH", "GPON"]
+    match: ["AN5506", "FiberHome"]
+
+  - vendor: Sagemcom
+    model: F@st 5657
+    category: DSL Modem Router
+    supports: ["ADSL2+", "VDSL2"]
+    access_hints: ["DSL", "VDSL"]
+    match: ["F@st 5657", "Fast 5657", "Sagemcom 5657"]
+
+  - vendor: Netgear
+    model: CM / CG Series
+    category: Cable Modem
+    supports: ["DOCSIS"]
+    access_hints: ["Cable", "DOCSIS"]
+    match: ["CM500", "CM600", "CM1000", "CG3000"]
+
+  - vendor: ZTE
+    model: MC801A
+    category: 5G CPE
+    supports: ["5G", "LTE"]
+    access_hints: ["FWA", "Mobile", "LTE"]
+    match: ["MC801", "MC801A", "5G CPE"]

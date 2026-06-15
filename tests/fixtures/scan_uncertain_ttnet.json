@@ -1,0 +1,36 @@
+[
+  {
+    "probe_name": "adapter_probe",
+    "status": "success",
+    "confidence": 0.4,
+    "evidence": {
+      "active": ["Ethernet 2", "Ethernet", "VMware Network Adapter VMnet1"],
+      "adapters": [
+        { "name": "Ethernet 2", "mac": "0a:00:27:00:00:17", "up": true, "addrs": ["169.254.218.14/16"] },
+        { "name": "Ethernet", "mac": "74:d4:dd:39:04:66", "up": true, "addrs": ["192.168.31.147/24"] },
+        { "name": "VMware Network Adapter VMnet8", "mac": "00:50:56:c0:00:08", "up": true, "addrs": ["169.254.162.246/16"] },
+        { "name": "Wi-Fi", "mac": "c0:a5:e8:aa:ce:6d", "up": false, "addrs": ["169.254.84.67/16"] }
+      ]
+    }
+  },
+  { "probe_name": "gateway_probe", "status": "success", "confidence": 0.3, "evidence": { "gateway": "192.168.31.1" } },
+  { "probe_name": "dns_probe", "status": "success", "confidence": 0.2, "evidence": { "servers": ["8.8.8.8", "9.9.9.9"] } },
+  { "probe_name": "latency_probe", "status": "success", "confidence": 0.3, "evidence": { "avg_ms": 3.8, "jitter_ms": 2.0, "method": "icmp", "target": "1.1.1.1" } },
+  { "probe_name": "upnp_probe", "status": "success", "confidence": 0, "evidence": { "found": false } },
+  { "probe_name": "public_ip_probe", "status": "success", "confidence": 0.3, "evidence": { "public_ip": "95.15.182.146", "cgnat": false } },
+  {
+    "probe_name": "traceroute_probe",
+    "status": "success",
+    "confidence": 0.25,
+    "evidence": {
+      "hop_count": 5,
+      "hops": ["192.168.31.1", "192.168.1.1", "95.15.180.1", "81.212.73.143", "142.250.168.28"]
+    }
+  },
+  {
+    "probe_name": "asn_probe",
+    "status": "success",
+    "confidence": 0.2,
+    "evidence": { "public_ip": "95.15.182.146", "ptr": "95.15.182.146.dynamic.ttnet.com.tr", "org": "TurkTelekom" }
+  }
+]

@@ -1,0 +1,39 @@
+# WAN interface-name patterns (doc §15).
+#
+# NOTE on realism: a *client* OS cannot see the modem's WAN interface name
+# (ptm0/atm0/gpon0). These rules only fire when router-side data surfaces that
+# name via UPnP/SNMP/HTTP. They use the same rule schema as access_rules.yaml.
+
+rules:
+  - id: iface_ptm_vdsl
+    if:
+      interface_name_matches:
+        - "ptm0"
+        - "ptm"
+    then:
+      add_score:
+        VDSL: 45
+        VDSL2: 40
+        DSL: 30
+
+  - id: iface_atm_adsl
+    if:
+      interface_name_matches:
+        - "atm0"
+        - "atm"
+    then:
+      add_score:
+        ADSL: 45
+        DSL: 30
+
+  - id: iface_gpon_fiber
+    if:
+      interface_name_matches:
+        - "gpon0"
+        - "gpon"
+        - "eth-wan"
+    then:
+      add_score:
+        Fiber: 45
+        FTTH: 40
+        GPON: 40

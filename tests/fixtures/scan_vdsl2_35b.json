@@ -1,0 +1,45 @@
+[
+  {
+    "probe_name": "tr064_probe",
+    "status": "success",
+    "confidence": 0.8,
+    "evidence": {
+      "tr064_found": true,
+      "ip": "192.168.178.1",
+      "manufacturer": "AVM",
+      "model": "FRITZ!Box 7590",
+      "wan_access_type": "DSL",
+      "device_confidence": 0.55,
+      "access_confidence": 0.8,
+      "strong_access_evidence": true,
+      "cpe_kv": {
+        "NewModulationType": "VDSL2",
+        "NewStatus": "Up",
+        "NewUpstreamNoiseMargin": "62",
+        "NewDownstreamNoiseMargin": "61",
+        "NewUpstreamAttenuation": "85",
+        "NewDownstreamAttenuation": "115",
+        "NewUpstreamCurrRate": "48000",
+        "NewDownstreamCurrRate": "294000",
+        "NewUpstreamMaxRate": "52000",
+        "NewDownstreamMaxRate": "310000",
+        "NewDataPath": "Interleaved",
+        "X_AVM-DE_VDSLProfile": "Profile 35b"
+      },
+      "cpe_text": "AVM FRITZ!Box 7590 VDSL2 G.993.5 Super Vectoring Profile 35b"
+    },
+    "hints": ["DSL", "VDSL"]
+  },
+  {
+    "probe_name": "adapter_probe",
+    "status": "success",
+    "confidence": 0.4,
+    "evidence": { "active": ["Ethernet"] }
+  },
+  {
+    "probe_name": "latency_probe",
+    "status": "success",
+    "confidence": 0.3,
+    "evidence": { "avg_ms": 14.0, "jitter_ms": 2.0, "method": "tcp", "target": "1.1.1.1" }
+  }
+]

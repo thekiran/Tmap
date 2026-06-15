@@ -1,0 +1,28 @@
+[
+  {
+    "probe_name": "upnp_probe",
+    "status": "success",
+    "confidence": 0.7,
+    "evidence": {
+      "found": true,
+      "manufacturer": "Huawei",
+      "model": "B535",
+      "device_type": "urn:schemas-upnp-org:device:InternetGatewayDevice:1",
+      "router_model": "Huawei B535-232",
+      "router_text": "Huawei B535-232 LTE Router"
+    }
+  },
+  {
+    "probe_name": "public_ip_probe",
+    "status": "success",
+    "confidence": 0.6,
+    "evidence": { "public_ip": "100.96.10.20", "cgnat": true },
+    "hints": ["Mobile", "FWA"]
+  },
+  {
+    "probe_name": "latency_probe",
+    "status": "success",
+    "confidence": 0.3,
+    "evidence": { "avg_ms": 42.0, "jitter_ms": 15.0, "method": "tcp", "target": "1.1.1.1" }
+  }
+]

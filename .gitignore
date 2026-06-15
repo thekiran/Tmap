@@ -1,0 +1,13 @@
+# Build artifacts
+/agent/iad-agent
+/agent/iad-agent.exe
+*.exe
+
+# Generated scan reports
+/report.json
+/report-deep.json
+*.report.json
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db

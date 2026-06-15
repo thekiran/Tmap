@@ -1,0 +1,141 @@
+# Access scoring rules (doc §5.3).
+#
+# A rule fires when ANY of its specified `if` groups matches; within a group the
+# entries are OR'd. A fired rule applies its `add_score` deltas (in points; the
+# engine normalizes 100 points -> 1.0). Edit this file to support new
+# modems/ISPs without recompiling the agent.
+#
+# Match groups available under `if`:
+#   router_model_contains  - substrings checked against the discovered model
+#   text_contains          - substrings checked against all textual evidence
+#   interface_name_matches - substrings checked against interface names
+#   hint_contains          - substrings checked against probe/fingerprint hints
+
+rules:
+  - id: dsl_model_hint
+    if:
+      router_model_contains:
+        - "DSL"
+        - "VR300"
+        - "VR400"
+        - "VR600"
+        - "Keenetic DSL"
+        - "VMG3312"
+        - "VMG3625"
+    then:
+      add_score:
+        DSL: 40
+        VDSL: 35
+        ADSL: 20
+
+  - id: gpon_model_hint
+    if:
+      router_model_contains:
+        - "HG8245"
+        - "HG8010"
+        - "G-2425G"
+        - "ONT"
+        - "GPON"
+    then:
+      add_score:
+        Fiber: 50
+        FTTH: 45
+        GPON: 45
+
+  - id: docsis_hint
+    if:
+      text_contains:
+        - "DOCSIS"
+        - "Cable Modem"
+        - "EuroDOCSIS"
+    then:
+      add_score:
+        Cable: 60
+        DOCSIS: 60
+
+  - id: lte_router_hint
+    if:
+      router_model_contains:
+        - "B535"
+        - "B525"
+        - "MF286"
+        - "LTE"
+        - "5G CPE"
+    then:
+      add_score:
+        Mobile: 45
+        FWA: 40
+        LTE: 35
+
+  - id: wisp_cpe_hint
+    if:
+      router_model_contains:
+        - "MikroTik"
+        - "Ubiquiti"
+        - "airMAX"
+        - "RouterOS"
+        - "LiteBeam"
+        - "NanoStation"
+    then:
+      add_score:
+        WISP: 45
+
+  - id: cgnat_mobile_hint
+    if:
+      hint_contains:
+        - "Mobile"
+        - "FWA"
+    then:
+      add_score:
+        Mobile: 20
+        FWA: 20
+
+  - id: satellite_hint
+    if:
+      text_contains:
+        - "Starlink"
+        - "VSAT"
+      hint_contains:
+        - "Satellite"
+    then:
+      add_score:
+        Satellite: 50
+
+  - id: cpe_wan_dsl_physical_hint
+    if:
+      text_contains:
+        - "WANDSLInterfaceConfig"
+        - "WANCommonInterfaceConfig DSL"
+        - "VDSL2"
+        - "PTM"
+        - "LineRate"
+    then:
+      add_score:
+        DSL: 45
+        VDSL: 40
+        ADSL: 20
+
+  - id: cpe_wan_fiber_physical_hint
+    if:
+      text_contains:
+        - "WAN GPON"
+        - "GPON"
+        - "ONT"
+        - "ONU"
+        - "FTTH"
+    then:
+      add_score:
+        Fiber: 45
+        FTTH: 40
+        GPON: 40
+
+  - id: cpe_wan_docsis_physical_hint
+    if:
+      text_contains:
+        - "DOCSIS"
+        - "EuroDOCSIS"
+        - "Cable Modem"
+    then:
+      add_score:
+        Cable: 45
+        DOCSIS: 45

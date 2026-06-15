@@ -1,0 +1,126 @@
+# ISP / PTR / ASN textual patterns (doc §5, §15).
+#
+# IMPORTANT — these are WEAK signals. A reverse-DNS hostname or ASN org name
+# reveals the *operator and IP pool*, not the physical access medium. A TTNet
+# dynamic PTR, for example, can be DSL, VDSL or fiber. So the weights here are
+# deliberately small: they nudge and provide context, they do NOT decide the
+# verdict. The decision layer requires *strong* physical evidence (modem
+# fingerprint, WAN interface, DSL/GPON/DOCSIS markers) before committing — when
+# only these patterns match, the result stays Unknown with the candidates shown.
+#
+# Matched against all textual evidence (reverse-DNS hostname, RDAP org name).
+# Same rule schema as access_rules.yaml.
+
+rules:
+  # PTR hostnames that literally embed a technology are the strongest of the
+  # weak signals, but still only moderate-low.
+  - id: ptr_vdsl
+    if:
+      text_contains:
+        - "vdsl"
+    then:
+      add_score:
+        VDSL: 12
+        DSL: 6
+
+  - id: ptr_adsl
+    if:
+      text_contains:
+        - "adsl"
+    then:
+      add_score:
+        ADSL: 12
+        DSL: 6
+
+  - id: ptr_fiber
+    if:
+      text_contains:
+        - "ftth"
+        - "fibre"
+        - "fiber"
+        - "gpon"
+    then:
+      add_score:
+        Fiber: 12
+        FTTH: 8
+
+  - id: ptr_cable
+    if:
+      text_contains:
+        - "docsis"
+        - "cable"
+        - "kabel"
+    then:
+      add_score:
+        Cable: 12
+        DOCSIS: 8
+
+  - id: ptr_mobile
+    if:
+      text_contains:
+        - "lte"
+        - "mobile"
+        - "umts"
+        - "4g"
+        - "5g"
+    then:
+      add_score:
+        Mobile: 12
+        FWA: 8
+
+  - id: ptr_satellite
+    if:
+      text_contains:
+        - "starlink"
+        - "vsat"
+        - "satellite"
+    then:
+      add_score:
+        Satellite: 15
+
+  # --- Turkish ISP brand patterns (starter set, doc §17) ---
+  # Brand alone does NOT pin the technology — these are the weakest signals and
+  # carry tiny weights. A TTNet dynamic IP only tells us "Türk Telekom fixed
+  # broadband pool, possibly DSL/VDSL/fiber" — not which one.
+
+  - id: isp_ttnet
+    if:
+      text_contains:
+        - "ttnet"
+        - "turktelekom"
+        - "turk telekom"
+    then:
+      add_score:
+        DSL: 4
+        VDSL: 4
+        Fiber: 3
+
+  - id: isp_superonline
+    if:
+      text_contains:
+        - "superonline"
+        - "turkcell"
+    then:
+      add_score:
+        Fiber: 6
+        FTTH: 4
+
+  - id: isp_vodafone_net
+    if:
+      text_contains:
+        - "vodafone"
+    then:
+      add_score:
+        DSL: 3
+        Fiber: 3
+
+  - id: isp_turksat_kablo
+    if:
+      text_contains:
+        - "turksat"
+        - "kablonet"
+        - "kablo"
+    then:
+      add_score:
+        Cable: 8
+        DOCSIS: 5

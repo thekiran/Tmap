@@ -1,0 +1,30 @@
+[
+  {
+    "probe_name": "tr064_probe",
+    "status": "success",
+    "confidence": 0.8,
+    "evidence": {
+      "tr064_found": true,
+      "ip": "192.168.100.1",
+      "manufacturer": "Technicolor",
+      "model": "CGA4233",
+      "device_confidence": 0.55,
+      "access_confidence": 0.8,
+      "strong_access_evidence": true,
+      "cpe_kv": {
+        "DownstreamChannels": "32",
+        "UpstreamChannels": "8",
+        "DownstreamPower": "3.5",
+        "SNR": "38.5"
+      },
+      "cpe_text": "Technicolor CGA4233 DOCSIS 3.1 Cable Modem OFDM OFDMA"
+    },
+    "hints": ["Cable", "DOCSIS"]
+  },
+  {
+    "probe_name": "adapter_probe",
+    "status": "success",
+    "confidence": 0.4,
+    "evidence": { "active": ["Ethernet"] }
+  }
+]

@@ -1,0 +1,21 @@
+[
+  {
+    "probe_name": "upnp_probe",
+    "status": "success",
+    "confidence": 0.7,
+    "evidence": {
+      "found": true,
+      "manufacturer": "Huawei",
+      "model": "HG8245H",
+      "device_type": "urn:schemas-upnp-org:device:InternetGatewayDevice:1",
+      "router_model": "Huawei HG8245H",
+      "router_text": "Huawei HG8245H GPON ONT"
+    }
+  },
+  {
+    "probe_name": "adapter_probe",
+    "status": "success",
+    "confidence": 0.4,
+    "evidence": { "active": ["Ethernet"] }
+  }
+]
