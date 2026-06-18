@@ -31,7 +31,7 @@ type ScannedHost struct {
 // the pipeline is testable without touching the real network.
 type Options struct {
 	RequestedCIDR  string // "auto" or a CIDR
-	Profile        string // quick | standard | deep
+	Profile        string // quick | normal | standard | deep | full
 	AllowPublic    bool   // dangerous: permit non-private scope
 	InterfaceName  string // explicit interface (empty → auto-select)
 	IncludeVirtual bool   // include virtual/loopback adapters
@@ -43,6 +43,7 @@ type Options struct {
 	// Collaborators (defaults used when nil).
 	Sweeper      Sweeper
 	ARPReader    ARPReader
+	ARPSweeper   ARPSweeper
 	Resolver     Resolver
 	Service      ServiceScanner         // optional (Nmap)
 	GatewayFn    func() (net.IP, error) // default: network.Gateway
@@ -113,11 +114,13 @@ func Run(ctx context.Context, opts Options) (models.ScanReport, error) {
 	}
 
 	// 4. Host discovery (only meaningful for IPv4 scopes).
-	hits, arpEntries, scanned := opts.discover(ctx, scope)
+	discStart := now()
+	res := opts.discover(ctx, scope)
 
 	// 5. Normalize into devices.
 	norm := &Normalizer{Store: store, Resolver: opts.resolver()}
-	devices, agentDevID, gatewayDevID := buildDevices(ctx, norm, primary, agentIP, gatewayIP, gatewayEvID, hits, arpEntries, scanned)
+	devices, agentDevID, gatewayDevID := buildDevices(ctx, norm, primary, agentIP, gatewayIP, gatewayEvID, res, now())
+	discoverySummary := buildDiscoverySummary(scope, res, len(devices), now().Sub(discStart).Milliseconds())
 
 	// 6. Build topology.
 	l2peers := sameSubnetPeers(devices, primary.CIDR, agentDevID, gatewayDevID)
@@ -158,72 +161,160 @@ func Run(ctx context.Context, opts Options) (models.ScanReport, error) {
 			InferredOnly: build.InferredOnly, Profile: scope.Profile,
 			DurationMS: now().Sub(start).Milliseconds(),
 		},
+		DiscoverySummary: discoverySummary,
 	}
 	return report, nil
 }
 
-// discover runs the sweep + ARP read + optional service (Nmap) scan, returning
-// the in-scope observations. Nothing outside the validated scope is returned.
-func (opts Options) discover(ctx context.Context, scope models.ScanScope) ([]HostHit, []ARPEntry, []ScannedHost) {
-	var hits []HostHit
-	if scope.HostCount > 0 { // IPv4, in-range
-		hits, _ = opts.sweeper().Sweep(ctx, scope)
+// buildDiscoverySummary rolls up which sources found how many devices.
+func buildDiscoverySummary(scope models.ScanScope, res sweepResult, deviceCount int, durMS int64) *models.DiscoverySummary {
+	countSrc := func(want ...string) int {
+		n := 0
+		for _, srcs := range res.sources {
+			for _, s := range srcs {
+				matched := false
+				for _, w := range want {
+					if s == w {
+						matched = true
+						break
+					}
+				}
+				if matched {
+					n++
+					break
+				}
+			}
+		}
+		return n
 	}
-	var scanned []ScannedHost
+	return &models.DiscoverySummary{
+		CIDR:             scope.CIDR,
+		AddressesScanned: scope.HostCount,
+		DevicesFound:     deviceCount,
+		ARPFound:         countSrc(srcARPSweep, srcARPTable),
+		TCPFound:         countSrc(srcTCP),
+		NmapFound:        countSrc(srcNmap),
+		ScanDurationMS:   durMS,
+	}
+}
+
+// Discovery source labels (one device may be found by several).
+const (
+	srcTCP      = "tcp"
+	srcARPSweep = "arp_sweep"
+	srcARPTable = "arp_table"
+	srcNmap     = "nmap"
+	srcSelf     = "self"
+	srcGateway  = "gateway"
+)
+
+// sweepResult is the merged, in-scope output of every discovery source plus a
+// per-IP record of which sources found each device.
+type sweepResult struct {
+	hits    []HostHit
+	arp     []ARPEntry // merged & deduped (active ARP sweep + neighbour table)
+	scanned []ScannedHost
+	sources map[string][]string // ip -> ordered unique discovery sources
+}
+
+func (r *sweepResult) addSource(ip, src string) {
+	if ip == "" {
+		return
+	}
+	for _, s := range r.sources[ip] {
+		if s == src {
+			return
+		}
+	}
+	r.sources[ip] = append(r.sources[ip], src)
+}
+
+// discover runs the multi-source LAN discovery pipeline: TCP-connect sweep, an
+// active ARP sweep (Windows SendARP), the OS neighbour table, and an optional
+// Nmap scan. It records which sources found each device. A device is included if
+// ANY source saw it — open ports are NOT required. Nothing outside the validated
+// scope is ever returned.
+func (opts Options) discover(ctx context.Context, scope models.ScanScope) sweepResult {
+	res := sweepResult{sources: map[string][]string{}}
+
+	if scope.HostCount > 0 { // IPv4, in-range
+		res.hits, _ = opts.sweeper().Sweep(ctx, scope)
+		for _, h := range res.hits {
+			res.addSource(h.IP, srcTCP)
+		}
+	}
+
+	// Merge ARP knowledge from two sources: the active ARP sweep (finds devices
+	// that answer ARP even with no open ports / blocked ICMP) and the OS
+	// neighbour table (captures the sweep's results plus prior traffic).
+	arpByIP := map[string]string{}
+	if scope.HostCount > 0 {
+		for _, e := range opts.arpSweeper().SweepARP(ctx, scope) {
+			if !InScope(scope, e.IP) {
+				continue
+			}
+			arpByIP[e.IP] = e.MAC
+			res.addSource(e.IP, srcARPSweep)
+		}
+	}
+	if tableEntries, err := opts.arpReader().Read(ctx); err == nil {
+		for _, e := range tableEntries {
+			if !InScope(scope, e.IP) { // never leak neighbours from other nets
+				continue
+			}
+			if arpByIP[e.IP] == "" {
+				arpByIP[e.IP] = e.MAC
+			}
+			res.addSource(e.IP, srcARPTable)
+		}
+	}
+	for ip, mac := range arpByIP {
+		res.arp = append(res.arp, ARPEntry{IP: ip, MAC: mac})
+	}
+	sort.Slice(res.arp, func(i, j int) bool { return ipLess(res.arp[i].IP, res.arp[j].IP) })
+
+	// Optional Nmap service scan.
 	if opts.Service != nil && opts.Service.Available() {
 		if hosts, err := opts.Service.Scan(ctx, scope); err == nil {
 			for _, h := range hosts {
 				if InScope(scope, h.IP) {
-					scanned = append(scanned, h)
+					res.scanned = append(res.scanned, h)
+					res.addSource(h.IP, srcNmap)
 				}
 			}
 		}
 	}
-	arpEntries, _ := opts.arpReader().Read(ctx)
-	// Keep only ARP entries inside scope (never leak neighbours from other nets).
-	var inScope []ARPEntry
-	for _, e := range arpEntries {
-		if InScope(scope, e.IP) {
-			inScope = append(inScope, e)
-		}
-	}
-	return hits, inScope, scanned
+	return res
 }
 
 // buildDevices assembles the device list: the agent, the gateway (if known), and
-// every discovered host, deduped by IP and ordered by IP for determinism. Nmap
-// data (when present) enriches each device with services, MAC and hostname.
-func buildDevices(ctx context.Context, norm *Normalizer, primary models.InterfaceInfo, agentIP, gatewayIP, gatewayEvID string, hits []HostHit, arp []ARPEntry, scanned []ScannedHost) ([]models.Device, string, string) {
+// every discovered host (from ANY source — open ports are not required), deduped
+// by IP and ordered by IP for determinism. Each device records how it was found
+// (discovery_sources), its MAC, and a reachability summary. Nmap data (when
+// present) enriches a device with services, MAC and hostname.
+func buildDevices(ctx context.Context, norm *Normalizer, primary models.InterfaceInfo, agentIP, gatewayIP, gatewayEvID string, res sweepResult, now time.Time) ([]models.Device, string, string) {
 	macByIP := map[string]string{}
-	for _, e := range arp {
+	for _, e := range res.arp {
 		macByIP[e.IP] = e.MAC
 	}
 	hitByIP := map[string]HostHit{}
-	for _, h := range hits {
+	for _, h := range res.hits {
 		hitByIP[h.IP] = h
 	}
 	scannedByIP := map[string]ScannedHost{}
-	for _, s := range scanned {
+	for _, s := range res.scanned {
 		scannedByIP[s.IP] = s
 	}
 
+	// The agent and gateway are proven facts; record them as discovery sources too.
+	res.addSource(agentIP, srcSelf)
+	res.addSource(gatewayIP, srcGateway)
+
 	ips := map[string]bool{}
-	addAll := func(keys ...string) {
-		for _, k := range keys {
-			if k != "" {
-				ips[k] = true
-			}
+	for ip := range res.sources {
+		if ip != "" {
+			ips[ip] = true
 		}
-	}
-	addAll(agentIP, gatewayIP)
-	for _, h := range hits {
-		ips[h.IP] = true
-	}
-	for _, e := range arp {
-		ips[e.IP] = true
-	}
-	for _, s := range scanned {
-		ips[s.IP] = true
 	}
 
 	ordered := make([]string, 0, len(ips))
@@ -262,9 +353,35 @@ func buildDevices(ctx context.Context, norm *Normalizer, primary models.Interfac
 		if hasScan {
 			norm.attachNmap(&d, s)
 		}
+
+		// Discovery metadata: surfaced on the map (badges) and details panel.
+		d.DiscoverySources = res.sources[ip]
+		d.MAC = mac
+		d.Reachability = reachabilityState(isAgent, isGateway, alive && len(h.OpenPorts) > 0, hasScan, mac != "")
+		if d.Hostname != "" {
+			d.Hostnames = []string{d.Hostname}
+		}
+		d.FirstSeen = now
+		d.LastSeen = now
 		devices = append(devices, d)
 	}
 	return devices, agentDevID, gatewayDevID
+}
+
+// reachabilityState summarizes how a device answered. arp_only means it is on the
+// LAN (answered ARP) but had no open probed port / service evidence — it must
+// still appear on the map, just with lower confidence.
+func reachabilityState(isAgent, isGateway, tcpOpen, hasNmap, hasMAC bool) string {
+	switch {
+	case isAgent:
+		return "self"
+	case isGateway, tcpOpen, hasNmap:
+		return "reachable"
+	case hasMAC:
+		return "arp_only"
+	default:
+		return "unknown"
+	}
 }
 
 // sameSubnetPeers returns device IDs (excluding agent and gateway) whose IP is in
@@ -330,6 +447,13 @@ func (opts Options) arpReader() ARPReader {
 		return opts.ARPReader
 	}
 	return OSARPReader{}
+}
+
+func (opts Options) arpSweeper() ARPSweeper {
+	if opts.ARPSweeper != nil {
+		return opts.ARPSweeper
+	}
+	return newARPSweeper()
 }
 
 func (opts Options) resolver() Resolver {

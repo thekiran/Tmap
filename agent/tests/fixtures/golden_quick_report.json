@@ -1,0 +1,34 @@
+{
+  "schema_version": "iad.topology/v1",
+  "scan_id": "topo_golden_quick",
+  "created_at": "2026-06-18T00:00:00Z",
+  "agent": {
+    "version": "test",
+    "hostname": "golden-host",
+    "os": "windows"
+  },
+  "scope": {
+    "requested": "auto",
+    "cidr": "192.168.1.0/24",
+    "interface": "Ethernet",
+    "host_count": 254,
+    "private": true,
+    "public_allowed": false,
+    "profile": "quick"
+  },
+  "devices": [],
+  "edges": [],
+  "evidence": [],
+  "evidence_registry": [],
+  "probe_inventory": [],
+  "warnings": [],
+  "summary": {
+    "device_count": 0,
+    "edge_count": 0,
+    "evidence_count": 0,
+    "high_confidence_edges": 0,
+    "inferred_only": true,
+    "profile": "quick",
+    "duration_ms": 0
+  }
+}

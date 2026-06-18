@@ -52,9 +52,13 @@ func usage() {
 
 Usage:
   iad-agent interfaces [--json]
-  iad-agent scan --cidr <auto|CIDR> --profile <quick|standard|deep> --output <file>
+  iad-agent scan --cidr <auto|CIDR> --profile <quick|normal|standard|deep|full> --output <file>
                  [--interface <name>] [--include-virtual] [--classify] [--nmap]
+                 [--nmap-bin <path>] [--full]
+                 [--redaction-mode <none|safe_to_share>] [--mask-public-ip]
+                 [--mask-mac] [--mask-hostnames]
                  [--allow-public] [--timeout <dur>]
+  iad-agent scan --full --output report-full.json
   iad-agent validate --input <file>
   iad-agent version
 

@@ -109,12 +109,20 @@ func Build(in BuildInput) BuildResult {
 	}
 
 	// 4) Inferred L2 (same subnet) — lowest confidence, explicitly inferred.
+	// Anchor same-subnet peers at the gateway when one is known (in a flat home
+	// LAN the router/gateway is the common L2 point, so the map reads as a star
+	// around it); fall back to the agent when there is no gateway. This is still
+	// an inferred relationship — never a claimed physical cable.
+	hub := in.GatewayID
+	if hub == "" {
+		hub = in.AgentID
+	}
 	for _, peer := range in.L2Peers {
 		if peer == in.AgentID || peer == in.GatewayID {
 			continue // gateway already linked via gateway_default; skip self
 		}
-		g.AddEdge(newEdge(in.AgentID, peer, models.EdgeInferredL2,
-			"On the same subnet as the agent (observed via ARP/ping); L2 adjacency is inferred from the shared broadcast domain, not proven.",
+		g.AddEdge(newEdge(hub, peer, models.EdgeInferredL2,
+			"On the same subnet (observed via ARP/ping); L2 adjacency is inferred from the shared broadcast domain and anchored at the gateway, not proven.",
 			0, nil))
 	}
 

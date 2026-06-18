@@ -7,6 +7,7 @@ import (
 
 	evnorm "github.com/thekiran/iad/internal/detection/evidence"
 	"github.com/thekiran/iad/internal/linestats"
+	"github.com/thekiran/iad/internal/modemcollector"
 	"github.com/thekiran/iad/internal/scoring"
 	"github.com/thekiran/iad/pkg/models"
 )
@@ -56,6 +57,7 @@ type evidenceBag struct {
 	JitterMS   float64
 	HasLatency bool
 	Gateway    string
+	AgentIP    string
 	Active     []string
 
 	UPnPFound         bool
@@ -63,6 +65,7 @@ type evidenceBag struct {
 	LocalAccess       string
 	Hops              []string
 	GatewayChain      []string
+	GatewayChainState *models.GatewayChainState
 	DoubleNATPossible bool
 	GatewayDevices    []models.GatewayDevice
 	LikelyModemIP     string
@@ -192,6 +195,7 @@ func (e *Engine) Analyze(in models.ScanInput, results []models.ProbeResult) mode
 		result.Explanation = buildUncertainExplanation("", scores, bag, matched, result.UncertaintyReasons)
 		result.NextBestProbes = nextBestProbes(bag, matched, result.Conflicts, scores)
 		populateOutputContract(&result, bag, matched, "")
+		attachModemCollection(&result)
 		return result
 	}
 
@@ -223,6 +227,7 @@ func (e *Engine) Analyze(in models.ScanInput, results []models.ProbeResult) mode
 		result.NextBestProbes = nextBestProbes(bag, matched, result.Conflicts, scores)
 		result.Explanation = buildUncertainExplanation(leading, scores, bag, matched, reasons)
 		populateOutputContract(&result, bag, matched, leading)
+		attachModemCollection(&result)
 		return result
 	}
 
@@ -234,7 +239,13 @@ func (e *Engine) Analyze(in models.ScanInput, results []models.ProbeResult) mode
 		result.NextBestProbes = nextBestProbes(bag, matched, result.Conflicts, scores)
 	}
 	populateOutputContract(&result, bag, matched, leading)
+	attachModemCollection(&result)
 	return result
+}
+
+func attachModemCollection(result *models.ScanResult) {
+	collection := modemcollector.Build(modemcollector.BuildInput{Result: *result})
+	result.ModemCollection = &collection
 }
 
 // applyLatencySignal adds the small, banded latency contribution. Latency never
@@ -299,6 +310,7 @@ func aggregate(results []models.ProbeResult) evidenceBag {
 			main := pickMainAdapter(adapters)
 			bag.MainAdapter = main.Name
 			bag.LocalAccess = main.Access
+			bag.AgentIP = main.IP
 			for _, a := range adapters {
 				bag.Interfaces = appendUnique(bag.Interfaces, a.Name)
 			}
@@ -395,7 +407,7 @@ func aggregate(results []models.ProbeResult) evidenceBag {
 				}
 				contributed = true
 			}
-		case "http_fingerprint_v2", "http_fingerprint_v3":
+		case "http_fingerprint_v2", "http_fingerprint_v3", "upstream_private_cpe_probe":
 			devices := getGatewayDevices(r.Evidence, "gateway_devices")
 			if len(devices) > 0 {
 				bag.GatewayDevices = append(bag.GatewayDevices, devices...)
@@ -470,6 +482,15 @@ func aggregate(results []models.ProbeResult) evidenceBag {
 
 	if bag.AccessArchitecture.LocalMedium == "" {
 		bag.AccessArchitecture.LocalMedium = bag.LocalAccess
+	}
+	if chainState := ResolveGatewayChainState(results, bag.Gateway, bag.AgentIP); chainState != nil {
+		bag.GatewayChainState = chainState
+		if len(chainState.Chain) > 0 {
+			bag.GatewayChain = append([]string{}, chainState.Chain...)
+		}
+		if chainState.InternalDoubleNATPossible {
+			bag.DoubleNATPossible = true
+		}
 	}
 	if bag.AccessArchitecture.WANMedium == "" {
 		bag.AccessArchitecture.WANMedium = firstWANMedium(bag.WANSignals, bag.StrongAccessHints)

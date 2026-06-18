@@ -223,8 +223,13 @@ func buildCandidates(scores map[string]float64, bag evidenceBag, matched bool) [
 				cand.Type = list[1].Type
 			}
 		}
-		cand.SupportingEvidence = candidateSupportingEvidence(tiers)
+		cand.Technology = candidateTechnology(cand)
+		cand.Standard = candidateStandard(cand)
+		cand.SupportingEvidence = candidateSupportingEvidence(cand, tiers)
+		cand.ContradictingEvidence = candidateContradictingEvidence(cand, tiers)
 		cand.MissingEvidence = candidateMissingEvidence(cand, tiers)
+		cand.WhyNot = candidateWhyNot(cand)
+		cand.Explanation = candidateExplanation(cand)
 		out = append(out, cand)
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -275,24 +280,132 @@ func buildEvidenceStrengthSummary(bag evidenceBag, matched bool) *models.Evidenc
 	}
 }
 
-func candidateSupportingEvidence(tiers models.EvidenceTiers) []models.EvidenceItem {
+func candidateSupportingEvidence(cand models.AccessCandidate, tiers models.EvidenceTiers) []models.EvidenceItem {
 	var out []models.EvidenceItem
 	if tiers.DirectPhysical.Present {
-		out = append(out, tiers.DirectPhysical.Items...)
+		out = appendMatchingEvidence(out, cand, tiers.DirectPhysical.Items)
 	}
 	if tiers.DeviceModel.Present {
-		out = append(out, tiers.DeviceModel.Items...)
-	}
-	if tiers.Topology.Present {
-		out = append(out, tiers.Topology.Items...)
-	}
-	if tiers.Performance.Present {
-		out = append(out, tiers.Performance.Items...)
-	}
-	if tiers.Regional.Present {
-		out = append(out, tiers.Regional.Items...)
+		out = appendMatchingEvidence(out, cand, tiers.DeviceModel.Items)
 	}
 	return out
+}
+
+func candidateContradictingEvidence(cand models.AccessCandidate, tiers models.EvidenceTiers) []models.EvidenceItem {
+	var out []models.EvidenceItem
+	for _, items := range [][]models.EvidenceItem{
+		tiers.DirectPhysical.Items,
+		tiers.DeviceModel.Items,
+	} {
+		for _, item := range items {
+			if item.TargetType == "" || item.TargetType == models.CatUnknown {
+				continue
+			}
+			if !candidateEvidenceMatches(cand, item) {
+				out = append(out, item)
+			}
+		}
+	}
+	return out
+}
+
+func appendMatchingEvidence(out []models.EvidenceItem, cand models.AccessCandidate, items []models.EvidenceItem) []models.EvidenceItem {
+	for _, item := range items {
+		if candidateEvidenceMatches(cand, item) {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+func candidateEvidenceMatches(cand models.AccessCandidate, item models.EvidenceItem) bool {
+	target := publicTypeForTarget(item.TargetType)
+	if target == models.CatUnknown || target == "" {
+		return false
+	}
+	targetCategory := models.CategoryFor(target)
+	if targetCategory == models.CatUnknown {
+		targetCategory = target
+	}
+	if targetCategory != cand.Category {
+		return false
+	}
+	if target == cand.Type || target == cand.Subtype || target == cand.Technology || target == cand.Standard {
+		return true
+	}
+	switch cand.Category {
+	case models.CatCable:
+		return target == models.TypeCable || target == models.TypeDOCSIS
+	case models.CatDSL:
+		return target == models.TypeDSL || target == models.TypeVDSL || target == models.TypeADSL || target == models.TypeVDSL2 || target == models.TypeADSL2
+	case models.CatFiber:
+		return target == models.TypeFiber || target == models.TypeFTTH || target == models.TypeGPON || target == models.TypeXGSPON
+	case models.CatMobile:
+		return target == models.TypeFWA || target == models.TypeMobile || target == models.TypeLTE || target == models.TypeNR5G
+	default:
+		return targetCategory == cand.Category
+	}
+}
+
+func candidateTechnology(cand models.AccessCandidate) string {
+	if cand.Subtype != "" {
+		return cand.Subtype
+	}
+	switch cand.Type {
+	case models.TypeCable:
+		return models.TypeDOCSIS
+	case models.TypeVDSL, models.TypeVDSL2:
+		return models.TypeVDSL2
+	case models.TypeADSL, models.TypeADSL2:
+		return models.TypeADSL
+	case models.TypeFTTH, models.TypeFiber:
+		return models.TypeGPON
+	case models.TypeFWA, models.TypeMobile:
+		return "LTE/5G NR"
+	case models.TypeWISP:
+		return models.TypeFixedWireless
+	default:
+		return cand.Type
+	}
+}
+
+func candidateStandard(cand models.AccessCandidate) string {
+	switch cand.Technology {
+	case models.TypeDOCSIS:
+		return "DOCSIS"
+	case models.TypeVDSL2:
+		return "ITU-T G.993.2"
+	case models.TypeADSL:
+		return "ITU-T G.992.x"
+	case models.TypeGPON:
+		return "ITU-T G.984"
+	case models.TypeXGSPON:
+		return "ITU-T G.9807.1"
+	default:
+		return ""
+	}
+}
+
+func candidateWhyNot(cand models.AccessCandidate) []string {
+	var out []string
+	if len(cand.SupportingEvidence) == 0 {
+		out = append(out, "No candidate-specific direct physical or model evidence was collected.")
+	}
+	if len(cand.ContradictingEvidence) > 0 {
+		out = append(out, "Direct or model evidence points at a different access category.")
+	}
+	out = append(out, cand.MissingEvidence...)
+	return out
+}
+
+func candidateExplanation(cand models.AccessCandidate) string {
+	if len(cand.SupportingEvidence) > 0 && len(cand.ContradictingEvidence) == 0 {
+		return "Candidate-specific evidence supports this access category."
+	}
+	if len(cand.ContradictingEvidence) > 0 {
+		return "This candidate is weaker because some direct/model evidence supports another access category."
+	}
+	return "This candidate is scoreable but lacks candidate-specific physical evidence."
 }
 
 func candidateMissingEvidence(cand models.AccessCandidate, tiers models.EvidenceTiers) []string {

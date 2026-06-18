@@ -1,0 +1,53 @@
+{
+  "schema_version": "iad.topology/v1",
+  "scan_id": "topo_golden_full",
+  "created_at": "2026-06-18T00:00:00Z",
+  "agent": {
+    "version": "test",
+    "hostname": "golden-host",
+    "os": "windows"
+  },
+  "scope": {
+    "requested": "auto",
+    "cidr": "192.168.1.0/24",
+    "interface": "Ethernet",
+    "host_count": 254,
+    "private": true,
+    "public_allowed": false,
+    "profile": "full"
+  },
+  "devices": [],
+  "edges": [],
+  "evidence": [],
+  "evidence_registry": [],
+  "probe_inventory": [
+    {
+      "name": "tcp_lan_sweep",
+      "category": "topology",
+      "status": "completed",
+      "duration_ms": 0,
+      "produced_evidence_count": 0,
+      "safety_mode": "private_scope_read_only_tcp_connect",
+      "output_path": "/devices"
+    }
+  ],
+  "warnings": [],
+  "summary": {
+    "device_count": 0,
+    "edge_count": 0,
+    "evidence_count": 0,
+    "high_confidence_edges": 0,
+    "inferred_only": true,
+    "profile": "full",
+    "duration_ms": 0
+  },
+  "capabilities": [
+    {
+      "name": "full_json_report",
+      "category": "report",
+      "status": "completed",
+      "output_path": "/"
+    }
+  ],
+  "redaction_mode": "none"
+}

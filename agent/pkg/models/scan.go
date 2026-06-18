@@ -17,6 +17,7 @@ const (
 const (
 	ModeQuick = "quick"
 	ModeDeep  = "deep"
+	ModeFull  = "full"
 )
 
 // ProbeResult is the single output format produced by every probe (doc §10).
@@ -26,6 +27,7 @@ type ProbeResult struct {
 	ProbeName  string         `json:"probe_name"`
 	Status     string         `json:"status"`
 	Confidence float64        `json:"confidence"`
+	DurationMS int64          `json:"duration_ms,omitempty"`
 	Evidence   map[string]any `json:"evidence,omitempty"`
 	Hints      []string       `json:"hints,omitempty"`
 	Errors     []string       `json:"errors,omitempty"`
@@ -44,45 +46,147 @@ type TypeScore struct {
 	Score float64 `json:"score"`
 }
 
+const (
+	ReachableTrue    = "true"
+	ReachableFalse   = "false"
+	ReachableUnknown = "unknown"
+)
+
+// ProbeAttempt records a read-only probe that did not produce positive device
+// evidence. Failures are preserved separately so they cannot overwrite earlier
+// successful reachability or identity evidence.
+type ProbeAttempt struct {
+	Source     string `json:"source,omitempty"`
+	Target     string `json:"target,omitempty"`
+	Protocol   string `json:"protocol,omitempty"`
+	Port       int    `json:"port,omitempty"`
+	URL        string `json:"url,omitempty"`
+	Method     string `json:"method,omitempty"`
+	Error      string `json:"error,omitempty"`
+	Timeout    bool   `json:"timeout,omitempty"`
+	EvidenceID string `json:"evidence_id,omitempty"`
+}
+
+type HTTPObservation struct {
+	Source            string   `json:"source,omitempty"`
+	URL               string   `json:"url,omitempty"`
+	Method            string   `json:"method,omitempty"`
+	StatusCode        int      `json:"status_code,omitempty"`
+	Title             string   `json:"title,omitempty"`
+	ServerHeader      string   `json:"server_header,omitempty"`
+	WWWAuthenticate   string   `json:"www_authenticate,omitempty"`
+	WWWAuthRealm      string   `json:"www_authenticate_realm,omitempty"`
+	RedirectLocation  string   `json:"redirect_location,omitempty"`
+	RedirectPath      string   `json:"redirect_path,omitempty"`
+	FaviconHash       string   `json:"favicon_hash,omitempty"`
+	HTMLMetaGenerator string   `json:"html_meta_generator,omitempty"`
+	LoginLabels       []string `json:"login_labels,omitempty"`
+	EvidenceID        string   `json:"evidence_id,omitempty"`
+}
+
+type TLSObservation struct {
+	Source     string   `json:"source,omitempty"`
+	IP         string   `json:"ip,omitempty"`
+	Port       int      `json:"port,omitempty"`
+	CN         string   `json:"cn,omitempty"`
+	SANs       []string `json:"sans,omitempty"`
+	Issuer     string   `json:"issuer,omitempty"`
+	ServerName string   `json:"server_name,omitempty"`
+	EvidenceID string   `json:"evidence_id,omitempty"`
+}
+
+type GatewayAccessEvidence struct {
+	Source     string   `json:"source,omitempty"`
+	Type       string   `json:"type,omitempty"`
+	Value      string   `json:"value,omitempty"`
+	Strength   string   `json:"strength,omitempty"`
+	Confidence float64  `json:"confidence,omitempty"`
+	Hints      []string `json:"hints,omitempty"`
+	EvidenceID string   `json:"evidence_id,omitempty"`
+}
+
+type GatewayHop struct {
+	IP         string `json:"ip"`
+	Role       string `json:"role"`
+	Source     string `json:"source,omitempty"`
+	Order      int    `json:"order"`
+	EvidenceID string `json:"evidence_id,omitempty"`
+}
+
+type GatewayChainSource struct {
+	Source                    string       `json:"source"`
+	Chain                     []string     `json:"chain,omitempty"`
+	PrivateHops               []GatewayHop `json:"private_hops,omitempty"`
+	InternalDoubleNATPossible bool         `json:"internal_double_nat_possible"`
+	Confidence                float64      `json:"confidence,omitempty"`
+	EvidenceIDs               []string     `json:"evidence_ids,omitempty"`
+}
+
+// GatewayChainState is the canonical merged gateway/NAT view. Traceroute-backed
+// private hops are monotonic evidence: later weaker probes can conflict with
+// them, but cannot erase them.
+type GatewayChainState struct {
+	DefaultGateway            string               `json:"default_gateway,omitempty"`
+	Chain                     []string             `json:"chain,omitempty"`
+	PrivateHops               []GatewayHop         `json:"private_hops,omitempty"`
+	InternalDoubleNATPossible bool                 `json:"internal_double_nat_possible"`
+	Sources                   []GatewayChainSource `json:"sources,omitempty"`
+	Conflicts                 []DataConflict       `json:"conflicts,omitempty"`
+	Confidence                float64              `json:"confidence,omitempty"`
+	EvidenceIDs               []string             `json:"evidence_ids,omitempty"`
+}
+
 // GatewayDevice is the local discovery result for one observed private gateway
 // IP. It is intentionally factual: the detection engine may use the text as
 // evidence, but the report also shows what was actually reachable.
 type GatewayDevice struct {
-	IP                         string   `json:"ip"`
-	Role                       string   `json:"role,omitempty"`
-	Reachable                  bool     `json:"reachable"`
-	HTTPTitle                  string   `json:"http_title,omitempty"`
-	ServerHeader               string   `json:"server_header,omitempty"`
-	WWWAuthenticate            string   `json:"www_authenticate,omitempty"`
-	FaviconHash                string   `json:"favicon_hash,omitempty"`
-	WWWAuthRealm               string   `json:"www_authenticate_realm,omitempty"`
-	RedirectPath               string   `json:"redirect_path,omitempty"`
-	RedirectLocation           string   `json:"redirect_location,omitempty"`
-	TLSCertCN                  string   `json:"tls_cert_cn,omitempty"`
-	TLSCertSANs                []string `json:"tls_cert_sans,omitempty"`
-	TLSServerName              string   `json:"tls_server_name,omitempty"`
-	HTMLMetaGenerator          string   `json:"html_meta_generator,omitempty"`
-	LoginLabels                []string `json:"login_labels,omitempty"`
-	UPnPFound                  bool     `json:"upnp_found"`
-	UPnPIGDFound               bool     `json:"upnp_igd_found"`
-	WANCommonInterfaceFound    bool     `json:"wan_common_interface_found"`
-	WANAccessType              string   `json:"wan_access_type,omitempty"`
-	PhysicalLinkStatus         string   `json:"physical_link_status,omitempty"`
-	Layer1UpstreamMaxBitRate   int64    `json:"layer1_upstream_max_bitrate,omitempty"`
-	Layer1DownstreamMaxBitRate int64    `json:"layer1_downstream_max_bitrate,omitempty"`
-	TR064Found                 bool     `json:"tr064_found"`
-	TR064AuthRequired          bool     `json:"tr064_auth_required"`
-	TR064Services              []string `json:"tr064_services,omitempty"`
-	MACVendor                  string   `json:"mac_vendor,omitempty"`
-	Model                      string   `json:"model,omitempty"`
-	Manufacturer               string   `json:"manufacturer,omitempty"`
-	FingerprintID              string   `json:"fingerprint_id,omitempty"`
-	AccessHints                []string `json:"access_hints,omitempty"`
-	PhysicalHints              []string `json:"physical_hints,omitempty"`
-	Notes                      []string `json:"notes,omitempty"`
-	DeviceConfidence           float64  `json:"device_confidence"`
-	AccessConfidence           float64  `json:"access_confidence"`
-	Confidence                 float64  `json:"confidence"`
+	IP                         string                  `json:"ip"`
+	Role                       string                  `json:"role,omitempty"`
+	ReachableState             string                  `json:"reachable_state,omitempty"`
+	Reachable                  bool                    `json:"reachable"`
+	OpenPorts                  []int                   `json:"open_ports,omitempty"`
+	HTTPObservations           []HTTPObservation       `json:"http_observations,omitempty"`
+	HTTPTitle                  string                  `json:"http_title,omitempty"`
+	ServerHeader               string                  `json:"server_header,omitempty"`
+	WWWAuthenticate            string                  `json:"www_authenticate,omitempty"`
+	FaviconHash                string                  `json:"favicon_hash,omitempty"`
+	WWWAuthRealm               string                  `json:"www_authenticate_realm,omitempty"`
+	RedirectPath               string                  `json:"redirect_path,omitempty"`
+	RedirectLocation           string                  `json:"redirect_location,omitempty"`
+	TLSObservations            []TLSObservation        `json:"tls_observations,omitempty"`
+	TLSCertCN                  string                  `json:"tls_cert_cn,omitempty"`
+	TLSCertSANs                []string                `json:"tls_cert_sans,omitempty"`
+	TLSCertIssuer              string                  `json:"tls_cert_issuer,omitempty"`
+	TLSServerName              string                  `json:"tls_server_name,omitempty"`
+	HTMLMetaGenerator          string                  `json:"html_meta_generator,omitempty"`
+	LoginLabels                []string                `json:"login_labels,omitempty"`
+	UPnPState                  string                  `json:"upnp_state,omitempty"`
+	UPnPFound                  bool                    `json:"upnp_found"`
+	UPnPIGDFound               bool                    `json:"upnp_igd_found"`
+	WANCommonInterfaceFound    bool                    `json:"wan_common_interface_found"`
+	WANAccessType              string                  `json:"wan_access_type,omitempty"`
+	PhysicalLinkStatus         string                  `json:"physical_link_status,omitempty"`
+	Layer1UpstreamMaxBitRate   int64                   `json:"layer1_upstream_max_bitrate,omitempty"`
+	Layer1DownstreamMaxBitRate int64                   `json:"layer1_downstream_max_bitrate,omitempty"`
+	TR064State                 string                  `json:"tr064_state,omitempty"`
+	TR064Found                 bool                    `json:"tr064_found"`
+	TR064AuthRequired          bool                    `json:"tr064_auth_required"`
+	TR064Services              []string                `json:"tr064_services,omitempty"`
+	SNMPState                  string                  `json:"snmp_state,omitempty"`
+	MACVendor                  string                  `json:"mac_vendor,omitempty"`
+	CPEModelGuess              string                  `json:"cpe_model_guess,omitempty"`
+	Model                      string                  `json:"model,omitempty"`
+	Manufacturer               string                  `json:"manufacturer,omitempty"`
+	FingerprintID              string                  `json:"fingerprint_id,omitempty"`
+	AccessEvidence             []GatewayAccessEvidence `json:"access_evidence,omitempty"`
+	AccessHints                []string                `json:"access_hints,omitempty"`
+	PhysicalHints              []string                `json:"physical_hints,omitempty"`
+	Notes                      []string                `json:"notes,omitempty"`
+	FailedAttempts             []ProbeAttempt          `json:"failed_attempts,omitempty"`
+	DeviceConfidence           float64                 `json:"device_confidence"`
+	AccessConfidence           float64                 `json:"access_confidence"`
+	Confidence                 float64                 `json:"confidence"`
+	EvidenceIDs                []string                `json:"evidence_ids,omitempty"`
 }
 
 // WANSignal is a confirmed WAN-side CPE signal. It is kept separate from
@@ -150,14 +254,19 @@ type EvidenceStrengthSummary struct {
 // category/type/subtype tree, so a parent (Fiber) and its child (FTTH/GPON) are
 // a single candidate instead of competing flat scores.
 type AccessCandidate struct {
-	Category           string         `json:"category,omitempty"`
-	Type               string         `json:"type"`
-	Subtype            string         `json:"subtype,omitempty"`
-	Score              float64        `json:"score"`
-	Confidence         float64        `json:"confidence,omitempty"`
-	EvidenceStrength   string         `json:"evidence_strength,omitempty"`
-	SupportingEvidence []EvidenceItem `json:"supporting_evidence,omitempty"`
-	MissingEvidence    []string       `json:"missing_evidence,omitempty"`
+	Category              string         `json:"category,omitempty"`
+	Type                  string         `json:"type"`
+	Technology            string         `json:"technology,omitempty"`
+	Standard              string         `json:"standard,omitempty"`
+	Subtype               string         `json:"subtype,omitempty"`
+	Score                 float64        `json:"score"`
+	Confidence            float64        `json:"confidence,omitempty"`
+	EvidenceStrength      string         `json:"evidence_strength,omitempty"`
+	SupportingEvidence    []EvidenceItem `json:"supporting_evidence,omitempty"`
+	ContradictingEvidence []EvidenceItem `json:"contradicting_evidence,omitempty"`
+	MissingEvidence       []string       `json:"missing_evidence,omitempty"`
+	Explanation           string         `json:"explanation,omitempty"`
+	WhyNot                []string       `json:"why_not,omitempty"`
 }
 
 // Classification is the UI/API-facing verdict. PrimaryType is intentionally a
@@ -165,6 +274,9 @@ type AccessCandidate struct {
 // such as GPON, VDSL2, or DOCSIS 3.1 when the evidence supports them.
 type Classification struct {
 	PrimaryType          string  `json:"primary_type"`
+	Category             string  `json:"category"`
+	Technology           string  `json:"technology,omitempty"`
+	Standard             *string `json:"standard,omitempty"`
 	Subtype              *string `json:"subtype"`
 	Confidence           float64 `json:"confidence"`
 	DecisionQuality      string  `json:"decision_quality"`
@@ -309,7 +421,8 @@ type ScanResult struct {
 	UncertaintyReasons []string `json:"uncertainty_reasons,omitempty"`
 	// DetectedNetworkContext carries the factual network situation (ISP, gateway
 	// chain, double-NAT, local access medium, ...) regardless of the verdict.
-	DetectedNetworkContext *NetworkContext `json:"detected_network_context,omitempty"`
+	DetectedNetworkContext *NetworkContext  `json:"detected_network_context,omitempty"`
+	ModemCollection        *ModemCollection `json:"modem_collection,omitempty"`
 
 	Scores map[string]float64 `json:"scores"`
 	// Candidates is the category/type/subtype view of the scores (preferred over
@@ -333,26 +446,27 @@ type ScanResult struct {
 // when the access type is Unknown, so the user always sees what *was* detected
 // (ISP, addresses, topology) versus what could not be concluded (the type).
 type NetworkContext struct {
-	ISP                string          `json:"isp,omitempty"`
-	Country            string          `json:"country,omitempty"`
-	Region             string          `json:"region,omitempty"`
-	PublicIP           string          `json:"public_ip,omitempty"`
-	PTR                string          `json:"ptr,omitempty"`
-	ASN                string          `json:"asn,omitempty"`
-	BGPOrg             string          `json:"bgp_org,omitempty"`
-	CGNAT              bool            `json:"cgnat"`
-	Gateway            string          `json:"gateway,omitempty"`
-	GatewayChain       []string        `json:"gateway_chain,omitempty"`
-	DoubleNATPossible  bool            `json:"double_nat_possible"`
-	LocalAccess        string          `json:"local_access,omitempty"`
-	MainAdapter        string          `json:"main_adapter,omitempty"`
-	AdapterType        string          `json:"adapter_type,omitempty"`
-	LinkSpeedMbps      int             `json:"link_speed_mbps,omitempty"`
-	RouterModel        string          `json:"router_model,omitempty"`
-	FingerprintMatched bool            `json:"fingerprint_matched"`
-	UPnPFound          bool            `json:"upnp_found"`
-	TR064Found         bool            `json:"tr064_found"`
-	GatewayDevices     []GatewayDevice `json:"gateway_devices,omitempty"`
+	ISP                string             `json:"isp,omitempty"`
+	Country            string             `json:"country,omitempty"`
+	Region             string             `json:"region,omitempty"`
+	PublicIP           string             `json:"public_ip,omitempty"`
+	PTR                string             `json:"ptr,omitempty"`
+	ASN                string             `json:"asn,omitempty"`
+	BGPOrg             string             `json:"bgp_org,omitempty"`
+	CGNAT              bool               `json:"cgnat"`
+	Gateway            string             `json:"gateway,omitempty"`
+	GatewayChain       []string           `json:"gateway_chain,omitempty"`
+	GatewayChainState  *GatewayChainState `json:"gateway_chain_state,omitempty"`
+	DoubleNATPossible  bool               `json:"double_nat_possible"`
+	LocalAccess        string             `json:"local_access,omitempty"`
+	MainAdapter        string             `json:"main_adapter,omitempty"`
+	AdapterType        string             `json:"adapter_type,omitempty"`
+	LinkSpeedMbps      int                `json:"link_speed_mbps,omitempty"`
+	RouterModel        string             `json:"router_model,omitempty"`
+	FingerprintMatched bool               `json:"fingerprint_matched"`
+	UPnPFound          bool               `json:"upnp_found"`
+	TR064Found         bool               `json:"tr064_found"`
+	GatewayDevices     []GatewayDevice    `json:"gateway_devices,omitempty"`
 	// LikelyCPEIP is the preferred name; LikelyModemIP is retained for backward
 	// compatibility and mirrors it.
 	LikelyCPEIP   string      `json:"likely_cpe_ip,omitempty"`

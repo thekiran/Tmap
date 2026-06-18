@@ -1,0 +1,59 @@
+/* ---------------------------------------------------------------------------
+   IAD — Typography tokens
+   Space Grotesk (display) · IBM Plex Sans (UI/body) · JetBrains Mono (data)
+   Type scale is a ~1.20 minor-third, tuned for an information-dense console.
+--------------------------------------------------------------------------- */
+
+:root {
+  /* ---- Families ---------------------------------------------------------- */
+  --font-display: 'Space Grotesk', 'IBM Plex Sans', system-ui, sans-serif;
+  --font-sans:    'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  /* ---- Weights ----------------------------------------------------------- */
+  --fw-regular: 400; /* @kind font */
+  --fw-medium: 500; /* @kind font */
+  --fw-semibold: 600; /* @kind font */
+  --fw-bold: 700; /* @kind font */
+
+  /* ---- Sizes (px → rem on 16px root) ------------------------------------- */
+  --text-2xs: 0.6875rem;  /* 11 — micro labels, only in mono caps */
+  --text-xs:  0.75rem;    /* 12 — captions, table meta */
+  --text-sm:  0.8125rem;  /* 13 — secondary UI text */
+  --text-base:0.9375rem;  /* 15 — body default */
+  --text-md:  1.0625rem;  /* 17 — emphasized body */
+  --text-lg:  1.25rem;    /* 20 — card titles */
+  --text-xl:  1.5rem;     /* 24 — section headings */
+  --text-2xl: 2rem;       /* 32 — page titles */
+  --text-3xl: 2.75rem;    /* 44 — verdict headline */
+  --text-4xl: 3.75rem;    /* 60 — hero / big number */
+
+  /* ---- Line heights ------------------------------------------------------ */
+  --lh-tight: 1.05; /* @kind font */
+  --lh-snug: 1.2; /* @kind font */
+  --lh-normal: 1.5; /* @kind font */
+  --lh-relaxed: 1.65; /* @kind font */
+
+  /* ---- Letter spacing ---------------------------------------------------- */
+  --ls-tight: -0.02em; /* @kind font */
+  --ls-snug: -0.01em; /* @kind font */
+  --ls-normal: 0; /* @kind font */
+  --ls-wide: 0.04em; /* @kind font */
+  --ls-caps: 0.10em; /* @kind font */
+
+  /* ---- Semantic roles ---------------------------------------------------- */
+  --type-hero:   var(--fw-bold) var(--text-4xl)/var(--lh-tight) var(--font-display);
+  --type-verdict:var(--fw-bold) var(--text-3xl)/var(--lh-tight) var(--font-display);
+  --type-h1:     var(--fw-semibold) var(--text-2xl)/var(--lh-snug) var(--font-display);
+  --type-h2:     var(--fw-semibold) var(--text-xl)/var(--lh-snug) var(--font-display);
+  --type-h3:     var(--fw-semibold) var(--text-lg)/var(--lh-snug) var(--font-display);
+  --type-body:   var(--fw-regular) var(--text-base)/var(--lh-normal) var(--font-sans);
+  --type-body-sm:var(--fw-regular) var(--text-sm)/var(--lh-normal) var(--font-sans);
+  --type-caption:var(--fw-regular) var(--text-xs)/var(--lh-normal) var(--font-sans);
+}
+
+/* Overline / eyebrow utility — small uppercase mono label used for tier and
+   section labels throughout the product. */
+:root {
+  --type-overline: var(--fw-semibold) var(--text-2xs)/1 var(--font-mono);
+}

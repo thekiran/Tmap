@@ -58,6 +58,24 @@ func ValidateReport(r models.ScanReport) []string {
 		}
 		evidenceIDs[e.ID] = true
 	}
+	registryIDs := map[string]bool{}
+	for i, e := range r.EvidenceRegistry {
+		if e.ID == "" {
+			add("evidence_registry[%d] has an empty id", i)
+			continue
+		}
+		if registryIDs[e.ID] {
+			add("duplicate evidence_registry id %q", e.ID)
+		}
+		registryIDs[e.ID] = true
+		evidenceIDs[e.ID] = true
+		if e.Source == "" {
+			add("evidence_registry %q has no source", e.ID)
+		}
+		if e.Kind == "" {
+			add("evidence_registry %q has no kind", e.ID)
+		}
+	}
 
 	// Devices/services reference valid evidence.
 	for _, d := range r.Devices {
@@ -78,6 +96,15 @@ func ValidateReport(r models.ScanReport) []string {
 		if !validEdgeTypes[e.Type] {
 			add("edge %q has unknown type %q", e.ID, e.Type)
 		}
+		if e.Layer == "" {
+			add("edge %q has no layer", e.ID)
+		}
+		if e.Relationship == "" {
+			add("edge %q has no relationship", e.ID)
+		}
+		if e.UILineStyle == "" {
+			add("edge %q has no ui_line_style", e.ID)
+		}
 		if e.Confidence < 0 || e.Confidence > 1 {
 			add("edge %q confidence %.3f out of range [0,1]", e.ID, e.Confidence)
 		}
@@ -92,6 +119,9 @@ func ValidateReport(r models.ScanReport) []string {
 		}
 		if IsPhysicalEvidenceEdge(e.Type) && len(e.EvidenceIDs) == 0 {
 			add("edge %q claims physical adjacency (%s) but cites no evidence", e.ID, e.Type)
+		}
+		if !IsPhysicalEvidenceEdge(e.Type) && e.Physical {
+			add("edge %q marks physical=true without physical proof edge type %q", e.ID, e.Type)
 		}
 		checkEvidence(add, "edge "+e.ID, e.EvidenceIDs, evidenceIDs)
 	}

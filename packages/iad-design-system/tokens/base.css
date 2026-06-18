@@ -1,0 +1,81 @@
+/* ---------------------------------------------------------------------------
+   IAD — Base layer
+   Light reset + element defaults wired to the tokens. Consuming projects get a
+   sensible dark "instrument" canvas for free by linking styles.css.
+--------------------------------------------------------------------------- */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg-app);
+  color: var(--text-body);
+  font: var(--type-body);
+  font-feature-settings: "ss01", "cv01", "tnum";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 { color: var(--text-strong); margin: 0; text-wrap: balance; }
+h1 { font: var(--type-h1); }
+h2 { font: var(--type-h2); }
+h3 { font: var(--type-h3); }
+p  { margin: 0; text-wrap: pretty; }
+
+a {
+  color: var(--accent-bright);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+a:hover { color: var(--accent-base); }
+
+code, kbd, samp, pre, .mono { font-family: var(--font-mono); }
+
+::selection { background: var(--accent-ghost); color: var(--fg-1); }
+
+:focus-visible {
+  outline: 2px solid var(--accent-base);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+hr { border: 0; border-top: 1px solid var(--hairline); margin: var(--space-6) 0; }
+
+/* Thin, technical scrollbars to match the instrument feel */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-3) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--fg-4); background-clip: padding-box; }
+
+/* ---- Shared helper classes consumers can rely on ----------------------- */
+
+/* Mono uppercase eyebrow / overline used for tier + section labels */
+.iad-overline {
+  font: var(--type-overline);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Tabular numerals for any metric readout */
+.iad-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* Subtle dot-grid backdrop — the canonical IAD "instrument" texture.
+   Apply to a full-bleed wrapper; pairs with --bg-app. */
+.iad-grid-bg {
+  background-color: var(--bg-app);
+  background-image: radial-gradient(var(--grid-line) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: -1px -1px;
+}

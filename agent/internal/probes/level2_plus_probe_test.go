@@ -202,8 +202,8 @@ func fakeHTTPFingerprintV2Probe(gateway string, result httpFingerprintV2Result) 
 		fetch: func(ctx context.Context, endpoint string) (httpFingerprintV2Result, error) {
 			return result, nil
 		},
-		tlsInfo: func(ctx context.Context, ip string) (string, []string) {
-			return "", nil
+		tlsInfo: func(ctx context.Context, ip string) (string, []string, string) {
+			return "", nil, ""
 		},
 	}}
 }

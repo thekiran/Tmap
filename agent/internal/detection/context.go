@@ -51,6 +51,7 @@ func buildNetworkContext(bag evidenceBag, matched bool) *models.NetworkContext {
 		CGNAT:              bag.CGNAT,
 		Gateway:            bag.Gateway,
 		GatewayChain:       bag.GatewayChain,
+		GatewayChainState:  bag.GatewayChainState,
 		DoubleNATPossible:  bag.DoubleNATPossible,
 		LocalAccess:        bag.LocalAccess,
 		MainAdapter:        bag.MainAdapter,

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -170,9 +171,19 @@ func (p GatewayChainProbe) discoverDevice(ctx context.Context, f gatewayChainFun
 	for _, endpoint := range gatewayHTTPURLs(ip) {
 		hr, err := f.httpGet(ctx, endpoint)
 		if err != nil {
+			dev.FailedAttempts = append(dev.FailedAttempts, failedHTTPAttempt(p.Name(), ip, endpoint, http.MethodGet, err))
 			continue
 		}
 		dev.Reachable = true
+		dev.ReachableState = models.ReachableTrue
+		if port := endpointPort(endpoint); port != 0 {
+			dev.OpenPorts = appendUniqueInts(dev.OpenPorts, port)
+		}
+		dev.HTTPObservations = append(dev.HTTPObservations, models.HTTPObservation{
+			Source: p.Name(), URL: endpoint, Method: http.MethodGet,
+			Title: hr.Title, ServerHeader: hr.Server, FaviconHash: hr.FaviconHash,
+			EvidenceID: p.Name() + ":" + endpoint,
+		})
 		if dev.HTTPTitle == "" {
 			dev.HTTPTitle = hr.Title
 		}
@@ -189,12 +200,19 @@ func (p GatewayChainProbe) discoverDevice(ctx context.Context, f gatewayChainFun
 		}
 	}
 
-	for _, port := range []string{"80", "443", "8080", "7547", "49000"} {
+	for _, port := range []string{"80", "443", "8080", "8443", "7547", "49000"} {
 		if f.checkTCP(ctx, ip, port) {
 			dev.Reachable = true
+			dev.ReachableState = models.ReachableTrue
+			dev.OpenPorts = appendUniqueInts(dev.OpenPorts, atoi(port))
 			if port == "49000" {
 				dev.TR064Found = true
 			}
+		} else {
+			dev.FailedAttempts = append(dev.FailedAttempts, models.ProbeAttempt{
+				Source: p.Name(), Target: ip, Protocol: "tcp", Port: atoi(port),
+				Error: "tcp connect failed", EvidenceID: p.Name() + ":" + ip + ":tcp:" + port + ":failed",
+			})
 		}
 	}
 
@@ -230,11 +248,19 @@ func (p GatewayChainProbe) discoverDevice(ctx context.Context, f gatewayChainFun
 	if dev.Model == "" {
 		dev.Model = inferModel(dev.HTTPTitle)
 	}
+	dev.CPEModelGuess = strings.TrimSpace(strings.Join([]string{dev.Manufacturer, dev.Model}, " "))
 	accessText := strings.Join(accessParts, " ") + " " + dev.Manufacturer + " " + dev.Model
 	dev.AccessHints = inferAccessHints(accessText)
 	dev.DeviceConfidence = gatewayDeviceConfidence(dev)
 	dev.AccessConfidence = gatewayDeviceAccessConfidence(dev, accessText)
 	dev.Confidence = dev.DeviceConfidence
+	dev.EvidenceIDs = appendUniqueStrings(dev.EvidenceIDs, p.Name()+":"+ip)
+	if dev.AccessConfidence > 0 {
+		dev.AccessEvidence = append(dev.AccessEvidence, models.GatewayAccessEvidence{
+			Source: p.Name(), Type: "device_text", Value: accessText, Strength: "medium",
+			Confidence: dev.AccessConfidence, Hints: dev.AccessHints, EvidenceID: p.Name() + ":" + ip + ":access",
+		})
+	}
 	return dev
 }
 
@@ -257,7 +283,9 @@ func gatewayHTTPURLs(ip string) []string {
 		"http://" + ip + "/",
 		"http://" + net.JoinHostPort(ip, "80") + "/",
 		"http://" + net.JoinHostPort(ip, "8080") + "/",
+		"http://" + net.JoinHostPort(ip, "7547") + "/",
 		"https://" + ip + "/",
+		"https://" + net.JoinHostPort(ip, "8443") + "/",
 	}
 }
 
@@ -566,4 +594,9 @@ func isRFC1918IPv4(ip string) bool {
 	default:
 		return false
 	}
+}
+
+func atoi(s string) int {
+	n, _ := strconv.Atoi(s)
+	return n
 }

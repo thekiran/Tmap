@@ -3,6 +3,16 @@
 /agent/iad-agent.exe
 *.exe
 
+# Node / frontend artifacts
+node_modules/
+/apps/desktop/frontend/node_modules/
+/apps/desktop/frontend/dist/
+/apps/desktop/frontend/.vite/
+
+# Wails desktop artifacts
+/apps/desktop/build/bin/
+/apps/desktop/build/windows/
+
 # Generated scan reports
 /report.json
 /report-deep.json

@@ -1,0 +1,12 @@
+/* ---------------------------------------------------------------------------
+   IAD — Webfonts
+   No brand fonts existed in the Tmap repo (the UI was specified but never built),
+   so these are deliberate substitutions chosen to match the "calm, technical,
+   trustworthy" brief. Loaded from Google Fonts. Swap the @import below for local
+   woff2 @font-face rules if you need a fully offline bundle.
+     - Space Grotesk : display / headings (engineered geometric grotesque)
+     - IBM Plex Sans : body & UI text (humanist technical sans)
+     - JetBrains Mono: data readouts (Mbps, dBm, ASN, IPs, code)
+--------------------------------------------------------------------------- */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');

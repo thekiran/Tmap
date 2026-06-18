@@ -1,0 +1,74 @@
+{
+  "schema_version": "iad.topology/v1",
+  "scan_id": "topo_golden_uncertain",
+  "created_at": "2026-06-18T00:00:00Z",
+  "agent": {
+    "version": "test"
+  },
+  "scope": {
+    "requested": "auto",
+    "cidr": "192.168.1.0/24",
+    "host_count": 254,
+    "private": true,
+    "public_allowed": false,
+    "profile": "full"
+  },
+  "devices": [],
+  "edges": [],
+  "evidence": [],
+  "evidence_registry": [],
+  "probe_inventory": [],
+  "warnings": [],
+  "summary": {
+    "device_count": 0,
+    "edge_count": 0,
+    "evidence_count": 0,
+    "high_confidence_edges": 0,
+    "inferred_only": true,
+    "profile": "full",
+    "duration_ms": 0
+  },
+  "access_classification": {
+    "scan_id": "scan_golden_uncertain",
+    "created_at": "2026-06-18T00:00:00Z",
+    "status": "completed",
+    "mode": "full",
+    "classification": {
+      "primary_type": "Unknown",
+      "category": "Unknown",
+      "subtype": null,
+      "confidence": 0,
+      "decision_quality": "low",
+      "state": "insufficient_evidence",
+      "safe_to_display_as_final": false
+    },
+    "primary_type": "Unknown",
+    "category": "Unknown",
+    "confidence": 0,
+    "classification_confidence": 0,
+    "context_confidence": 0,
+    "decision_quality": "low",
+    "uncertainty_reasons": [
+      "No direct WAN physical evidence was collected."
+    ],
+    "scores": {},
+    "alternatives": [],
+    "explanation": [],
+    "evidence_tiers": {
+      "direct_physical": { "status": "missing", "items": [] },
+      "device_model": { "status": "missing", "items": [] },
+      "topology": { "status": "missing", "items": [] },
+      "performance": { "status": "missing", "items": [] },
+      "regional": { "status": "missing", "items": [] }
+    },
+    "data_quality": {
+      "has_conflicts": false,
+      "conflicts": []
+    },
+    "ui": {
+      "headline": "Access type unknown",
+      "summary": "No direct WAN physical evidence was collected."
+    },
+    "evidence": []
+  }
+}

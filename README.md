@@ -6,8 +6,12 @@ with a scoring + confidence model. It never decides from a single signal: it
 collects evidence, scores each access type, computes a confidence, and **always
 shows why**.
 
-This repository currently contains the **MVP detection core**: a cross-platform
-Go agent with a CLI. The desktop UI (Tauri + React), local API, SQLite history,
+The imported desktop handoff lives alongside the agent: `apps/desktop/`
+contains the Wails + React console, and `packages/iad-design-system/` contains
+the design-system source, tokens, guidelines, and console UI kit.
+
+The Go scanner remains the **MVP detection core**: a cross-platform
+Go agent with a CLI. Local API, SQLite history,
 SNMP, and HTML/PDF reports are planned later phases — the probe and engine
 contracts are designed so they slot in without rework.
 
@@ -47,14 +51,16 @@ Requires Go 1.26+.
 ```sh
 cd agent
 
-# fast LAN-side scan
-go run ./cmd/iad-agent --mode quick --out ../report.json
+# full single-file JSON report: topology, device intel, capabilities,
+# evidence registry, probe inventory, UI graph, access classification,
+# modem/CPE candidates, raw evidence, and warnings
+go run ./cmd/iad-agent scan --full --output ../report-full.json
 
-# deeper scan: adds traceroute + reverse-DNS/ASN analysis
-go run ./cmd/iad-agent --mode deep  --out ../report-deep.json
+# fast LAN-side topology + device-intel report
+go run ./cmd/iad-agent scan --cidr auto --profile quick --output ../report.json
 
-# privacy mode: no probe contacts any external service
-go run ./cmd/iad-agent --mode quick --offline
+# deeper scan with access-type classification
+go run ./cmd/iad-agent scan --cidr auto --profile deep --classify --output ../report-deep.json
 ```
 
 Build a standalone binary:
@@ -68,11 +74,17 @@ go build -o iad-agent ./cmd/iad-agent      # add .exe on Windows
 
 | Flag        | Default   | Meaning                                                        |
 |-------------|-----------|---------------------------------------------------------------|
-| `--mode`    | `quick`   | `quick` (LAN-side, fast) or `deep` (adds traceroute + ASN)    |
-| `--online`  | `true`    | Allow probes that contact external services                   |
-| `--offline` | `false`   | Disable all online probes (overrides `--online`)              |
+| `--cidr`    | `auto`    | Scan scope: selected local CIDR or an explicit CIDR           |
+| `--profile` | `quick`   | `quick`, `standard`, or `deep`                                |
+| `--full`    | `false`   | Produce the complete single-file JSON report                  |
+| `--classify`| `false`   | Include access-type classification and probe evidence         |
+| `--nmap`    | `false`   | Use optional Nmap service discovery when available            |
+| `--redaction-mode` | `none` | Use `safe_to_share` metadata/redaction mode             |
+| `--mask-public-ip` | `false` | Mask public IP fields                                  |
+| `--mask-mac` | `false`  | Mask MAC addresses                                           |
+| `--mask-hostnames` | `false` | Mask hostnames                                       |
 | `--rules`   | auto      | Directory with the YAML rule/fingerprint files                |
-| `--out`     | (none)    | Write the full JSON report to this path                       |
+| `--output`  | (none)    | Write the JSON report to this path                            |
 
 ## How it works
 
@@ -100,6 +112,8 @@ agent/            Go module (CLI + probes + detection engine)
   cmd/iad-agent/  CLI entrypoint
   internal/       system, network, probes, detection, scoring, report
   pkg/models/     shared data contracts (ProbeResult, ScanResult, access types)
+apps/desktop/     Wails + React desktop console
+packages/         Imported design-system package(s)
 rules/            YAML rules + modem/ISP fingerprint databases
 tests/fixtures/   canned probe outputs for deterministic engine tests
 docs/             architecture + detection methods

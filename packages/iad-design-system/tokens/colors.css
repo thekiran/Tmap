@@ -1,0 +1,141 @@
+/* ---------------------------------------------------------------------------
+   IAD — Color tokens
+   A clean black/white "network instrument" system for a B2B network-engineering
+   desktop tool. Monochrome-first: surfaces and text are true neutral grays.
+   Color is RESERVED for meaning, never decoration:
+     1. Surfaces/ink  — layered neutral grays (near-black → light gray)
+     2. Accent        — one restrained blue, only for selection / focus / primary action
+     3. Confidence    — Low / Medium / High status scale (colorblind-safe)
+     4. Probe status  — success / partial / no_data / skipped / failed / blocked
+     5. Evidence tiers— muted categorical hues for topology layers (used sparingly)
+   Topology EDGES are encoded by line style (solid/dashed/dotted/thin), not color.
+   Dark is default; [data-theme="light"] supplies the light theme.
+--------------------------------------------------------------------------- */
+
+:root {
+  /* ---- Ink / surfaces (dark, default) — neutral, NOT blue-tinted ---------- */
+  --ink-900: #0A0A0B;   /* page base, deepest near-black */
+  --ink-850: #0E0E10;   /* app background */
+  --ink-800: #131316;   /* sunken panels / canvas */
+  --surface-1: #18181B; /* card base */
+  --surface-2: #1F1F23; /* raised card / hover */
+  --surface-3: #27272C; /* popover / active / node fill */
+  --hairline:  rgba(255,255,255,0.09);  /* default 1px border */
+  --hairline-strong: rgba(255,255,255,0.16);
+  --overlay:   rgba(0,0,0,0.66);         /* scrim behind dialogs */
+
+  /* ---- Foreground / text (white→gray hierarchy) -------------------------- */
+  --fg-1: #F4F4F5;  /* primary text */
+  --fg-2: #B6B7BC;  /* secondary text */
+  --fg-3: #818288;  /* muted / captions */
+  --fg-4: #5A5B61;  /* disabled / faint */
+  --fg-on-accent: #FFFFFF; /* text on accent fills */
+
+  /* ---- Accent: one restrained blue, for selection/focus/primary only ----- */
+  --accent-base: #3B82F6;
+  --accent-bright: #60A5FA;
+  --accent-dim: #2563EB;
+  --accent-ghost: rgba(59,130,246,0.14);
+  --accent-ring: rgba(59,130,246,0.45);
+
+  /* ---- Confidence scale (the headline status; always paired with text) --- */
+  --conf-low:    #8A8B92;  /* gray — uncertain is calm, never alarming */
+  --conf-low-bg: rgba(138,139,146,0.16);
+  --conf-med:    #D9A52B;  /* amber */
+  --conf-med-bg: rgba(217,165,43,0.14);
+  --conf-high:   #3FB67E;  /* green */
+  --conf-high-bg:rgba(63,182,126,0.14);
+
+  /* ---- Probe / process status ------------------------------------------- */
+  --ok:      #3FB67E;  --ok-bg:      rgba(63,182,126,0.14);   /* success */
+  --partial: #D9A52B;  --partial-bg: rgba(217,165,43,0.14);   /* partial */
+  --neutral: #8A8B92;  --neutral-bg: rgba(138,139,146,0.16);  /* no_data / skipped */
+  --danger:  #E05656;  --danger-bg:  rgba(224,86,86,0.14);    /* failed */
+  --blocked: #C678DB;  --blocked-bg: rgba(198,120,219,0.14);  /* blocked */
+  --warn:    #D9A52B;  --warn-bg:    rgba(217,165,43,0.14);
+  --info:    #60A5FA;  --info-bg:    rgba(96,165,250,0.14);
+
+  /* ---- Evidence tiers / topology layers (muted categorical, used sparingly) */
+  --tier-physical:    #D98C4A;  --tier-physical-bg: rgba(217,140,74,0.14);  /* link/phy */
+  --tier-l2:          #6FA8DC;  --tier-l2-bg:       rgba(111,168,220,0.14); /* L2 */
+  --tier-l3:          #9B8CE0;  --tier-l3-bg:       rgba(155,140,224,0.14); /* L3 */
+  --tier-nat:         #D98CB4;  --tier-nat-bg:      rgba(217,140,180,0.14); /* NAT */
+  --tier-isp:         #5CB8A6;  --tier-isp-bg:      rgba(92,184,166,0.14);  /* ISP route */
+
+  /* ---- Topology line tones (monochrome; encode meaning via style) -------- */
+  --edge-confirmed: var(--fg-2);   /* solid, full opacity */
+  --edge-inferred:  var(--fg-3);   /* dashed */
+  --edge-unknown:   var(--fg-4);   /* dotted */
+  --edge-muted:     rgba(255,255,255,0.18); /* low-confidence edges */
+  --node-stroke:    var(--hairline-strong);
+  --node-fill:      var(--surface-3);
+
+  /* ---- Data-viz neutral grid -------------------------------------------- */
+  --grid-line: rgba(255,255,255,0.05);
+  --grid-line-strong: rgba(255,255,255,0.09);
+
+  /* ---- Semantic aliases -------------------------------------------------- */
+  --bg-app: var(--ink-850);
+  --bg-sunken: var(--ink-800);
+  --surface-card: var(--surface-1);
+  --surface-raised: var(--surface-2);
+  --text-strong: var(--fg-1);
+  --text-body: var(--fg-2);
+  --text-muted: var(--fg-3);
+  --border-default: var(--hairline);
+  --accent: var(--accent-base);
+  --focus-ring: var(--accent-ring);
+}
+
+/* ---- Light theme --------------------------------------------------------- */
+[data-theme="light"] {
+  --ink-900: #E4E4E7;
+  --ink-850: #F4F4F5;
+  --ink-800: #ECECEE;
+  --surface-1: #FFFFFF;
+  --surface-2: #FAFAFB;
+  --surface-3: #F1F1F3;
+  --hairline:  rgba(9,9,11,0.11);
+  --hairline-strong: rgba(9,9,11,0.18);
+  --overlay:   rgba(9,9,11,0.38);
+
+  --fg-1: #111113;
+  --fg-2: #3F3F46;
+  --fg-3: #65656D;
+  --fg-4: #9A9AA2;
+  --fg-on-accent: #FFFFFF;
+
+  --accent-base: #2563EB;
+  --accent-bright: #3B82F6;
+  --accent-dim: #1D4ED8;
+  --accent-ghost: rgba(37,99,235,0.10);
+  --accent-ring: rgba(37,99,235,0.40);
+
+  --conf-low:  #6B6C73;  --conf-low-bg: rgba(107,108,115,0.12);
+  --conf-med:  #B5840F;  --conf-med-bg: rgba(181,132,15,0.12);
+  --conf-high: #1F9D63;  --conf-high-bg: rgba(31,157,99,0.12);
+
+  --ok: #1F9D63;      --ok-bg: rgba(31,157,99,0.12);
+  --partial: #B5840F; --partial-bg: rgba(181,132,15,0.12);
+  --neutral: #6B6C73; --neutral-bg: rgba(107,108,115,0.12);
+  --danger: #CB3B3B;  --danger-bg: rgba(203,59,59,0.12);
+  --blocked: #9B45B5; --blocked-bg: rgba(155,69,181,0.12);
+  --warn: #B5840F;    --warn-bg: rgba(181,132,15,0.12);
+  --info: #2563EB;    --info-bg: rgba(37,99,235,0.12);
+
+  --tier-physical: #B56A28; --tier-physical-bg: rgba(181,106,40,0.12);
+  --tier-l2: #2D6FB5;       --tier-l2-bg: rgba(45,111,181,0.12);
+  --tier-l3: #6B4FD6;       --tier-l3-bg: rgba(107,79,214,0.12);
+  --tier-nat: #B5457F;      --tier-nat-bg: rgba(181,69,127,0.12);
+  --tier-isp: #2E907E;      --tier-isp-bg: rgba(46,144,126,0.12);
+
+  --edge-confirmed: #3F3F46;
+  --edge-inferred:  #65656D;
+  --edge-unknown:   #9A9AA2;
+  --edge-muted:     rgba(9,9,11,0.18);
+  --node-stroke:    rgba(9,9,11,0.18);
+  --node-fill:      #FFFFFF;
+
+  --grid-line: rgba(9,9,11,0.06);
+  --grid-line-strong: rgba(9,9,11,0.10);
+}

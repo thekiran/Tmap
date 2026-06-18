@@ -29,6 +29,16 @@ type ARPReader interface {
 	Read(ctx context.Context) ([]ARPEntry, error)
 }
 
+// ARPSweeper actively resolves each in-scope address to a MAC (e.g. via the
+// Windows SendARP API). This discovers L2 devices that answer ARP even when they
+// have no open ports and drop ICMP — printers, IoT, phones. It returns one
+// ARPEntry per responder. Implementations are platform-specific; the non-Windows
+// build is a no-op and relies on the TCP-connect sweep populating the kernel
+// neighbour table (read afterwards via ARPReader).
+type ARPSweeper interface {
+	SweepARP(ctx context.Context, scope models.ScanScope) []ARPEntry
+}
+
 // Resolver does reverse DNS. Returns "" (no error) when there is no PTR.
 type Resolver interface {
 	LookupAddr(ctx context.Context, ip string) string
@@ -39,10 +49,10 @@ type Resolver interface {
 // full port scan (use Nmap for that). No stealth, SYN-only, or evasion behaviour.
 func profilePorts(profile string) []int {
 	switch profile {
-	case "deep":
+	case "deep", "full":
 		return []int{22, 23, 25, 53, 80, 110, 135, 139, 143, 443, 445, 587, 993, 995,
 			1883, 3389, 5000, 5060, 5357, 7547, 8080, 8443, 8843, 9000, 49152}
-	case "standard":
+	case "normal", "standard":
 		return []int{22, 23, 53, 80, 135, 139, 443, 445, 3389, 5357, 7547, 8080, 8443}
 	default: // quick
 		return []int{22, 53, 80, 135, 443, 445, 3389}

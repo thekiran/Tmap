@@ -419,6 +419,9 @@ func detectConflicts(results []models.ProbeResult, bag evidenceBag, scores map[s
 	}
 
 	conflicts = append(conflicts, detectDoubleNATConflicts(results, bag)...)
+	if bag.GatewayChainState != nil {
+		conflicts = append(conflicts, bag.GatewayChainState.Conflicts...)
+	}
 	conflicts = append(conflicts, detectWANTypeConflicts(results)...)
 
 	if hasEthernetWANSignal(bag) && (scores[models.TypeDSL] > 0.35 || scores[models.TypeVDSL] > 0.35 || scores[models.TypeADSL] > 0.35 || scores[models.TypeFiber] > 0.35) {
@@ -610,12 +613,16 @@ func conflictPenalty(conflicts []models.DataConflict) float64 {
 
 func populateOutputContract(result *models.ScanResult, bag evidenceBag, matched bool, leading string) {
 	primary, subtype := publicClassification(result.PrimaryType, leading, bag)
+	category, technology, standard := classificationDetails(primary, subtype)
 	direct := hasDirectPhysicalEvidence(bag)
 	state := classificationState(primary, result.Confidence, direct, result.Conflicts)
 	safe := primary != "Unknown" && state == "confirmed" && direct && len(result.Conflicts) == 0
 
 	result.Classification = models.Classification{
 		PrimaryType:          primary,
+		Category:             category,
+		Technology:           technology,
+		Standard:             optionalSubtype(standard),
 		Subtype:              subtype,
 		Confidence:           result.Confidence,
 		DecisionQuality:      result.DecisionQuality,
@@ -623,6 +630,51 @@ func populateOutputContract(result *models.ScanResult, bag evidenceBag, matched 
 		SafeToDisplayAsFinal: safe,
 	}
 	result.UI = buildUIOutput(*result, bag, primary, subtype, state)
+}
+
+func classificationDetails(primary string, subtype *string) (category, technology string, standard string) {
+	if primary == "" || primary == "Unknown" {
+		return models.CatUnknown, "", ""
+	}
+	category = models.CategoryFor(primary)
+	if category == models.CatUnknown {
+		category = primary
+	}
+	if subtype != nil && *subtype != "" {
+		technology = *subtype
+	} else {
+		switch primary {
+		case models.TypeCable:
+			technology = models.TypeDOCSIS
+		case models.TypeVDSL:
+			technology = models.TypeVDSL2
+		case models.TypeADSL:
+			technology = models.TypeADSL
+		case models.TypeFiber:
+			technology = models.TypeGPON
+		case models.TypeFWA:
+			technology = "LTE/5G NR"
+		case models.TypeWISP:
+			technology = models.TypeFixedWireless
+		case models.TypeEthernetWAN:
+			technology = models.TypeEthernet
+		default:
+			technology = primary
+		}
+	}
+	switch technology {
+	case models.TypeDOCSIS:
+		standard = "DOCSIS"
+	case models.TypeVDSL2:
+		standard = "ITU-T G.993.2"
+	case models.TypeADSL, models.TypeADSL2:
+		standard = "ITU-T G.992.x"
+	case models.TypeGPON:
+		standard = "ITU-T G.984"
+	case models.TypeXGSPON:
+		standard = "ITU-T G.9807.1"
+	}
+	return category, technology, standard
 }
 
 func publicClassification(primary, leading string, bag evidenceBag) (string, *string) {

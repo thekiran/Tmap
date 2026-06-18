@@ -7,11 +7,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/thekiran/iad/internal/detection"
+	"github.com/thekiran/iad/internal/deviceintel"
 	"github.com/thekiran/iad/internal/discovery"
-	"github.com/thekiran/iad/internal/nmap"
+	"github.com/thekiran/iad/internal/discovery/nmap"
+	"github.com/thekiran/iad/internal/network"
 	"github.com/thekiran/iad/internal/probes"
 	"github.com/thekiran/iad/internal/system"
 	"github.com/thekiran/iad/internal/topology"
@@ -54,24 +57,42 @@ func runInterfaces(args []string) error {
 func runScan(args []string) error {
 	fs := flag.NewFlagSet("scan", flag.ContinueOnError)
 	cidr := fs.String("cidr", "auto", "scan scope: auto or CIDR")
-	profile := fs.String("profile", "quick", "scan profile: quick | standard | deep")
+	profile := fs.String("profile", "quick", "scan profile: quick | normal | standard | deep | full")
 	output := fs.String("output", "", "write JSON report to this file")
 	outputShort := fs.String("o", "", "write JSON report to this file")
 	iface := fs.String("interface", "", "interface name to scan from")
 	includeVirtual := fs.Bool("include-virtual", false, "allow virtual adapters when selecting an interface")
 	classify := fs.Bool("classify", false, "include access-type classification")
 	useNmap := fs.Bool("nmap", false, "use optional Nmap service discovery when available")
+	nmapBin := fs.String("nmap-bin", "", "path to nmap executable (defaults to PATH lookup)")
+	full := fs.Bool("full", false, "write a complete single-file JSON report with all available sections and probes")
+	redactionMode := fs.String("redaction-mode", "none", "privacy redaction mode: none or safe_to_share")
+	maskPublicIP := fs.Bool("mask-public-ip", false, "mask public IP fields in the JSON report")
+	maskMAC := fs.Bool("mask-mac", false, "mask MAC addresses in the JSON report")
+	maskHostnames := fs.Bool("mask-hostnames", false, "mask hostnames in the JSON report")
 	allowPublic := fs.Bool("allow-public", false, "permit non-private scopes")
 	timeout := fs.Duration("timeout", 30*time.Second, "overall scan timeout")
 	rulesDir := fs.String("rules", "", "rules directory for --classify")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	profileSet, timeoutSet := false, false
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "profile":
+			profileSet = true
+		case "timeout":
+			timeoutSet = true
+		}
+	})
+	if *full {
+		applyFullScanDefaults(profileSet, timeoutSet, profile, classify, useNmap, timeout)
+	}
 	if *output == "" {
 		*output = *outputShort
 	}
-	if *profile != "quick" && *profile != "standard" && *profile != "deep" {
-		return fatalf("invalid --profile %q (use quick, standard, or deep)", *profile)
+	if !nmap.KnownProfile(*profile) {
+		return fatalf("invalid --profile %q (use quick, normal, standard, deep, or full)", *profile)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
@@ -89,13 +110,31 @@ func runScan(args []string) error {
 		opts.Hostname = host
 	}
 	opts.OS = system.Info().OS
+	// Wire real gateway + DNS detection so the scan can find the default route
+	// (used to pick the correct interface and to draw gateway/default edges) and
+	// record the resolvers in the report.
+	opts.GatewayFn = network.Gateway
+	opts.DNSFn = network.DNSServers
+	var nmapWarning *models.Warning
+	nmapAvailable := false
 	if *useNmap {
-		opts.Service = nmapService{runner: nmap.Runner{}, profile: *profile}
+		runner := nmap.Runner{Binary: *nmapBin}
+		if runner.Available() {
+			nmapAvailable = true
+			opts.Service = nmap.ServiceScanner{Runner: runner, Profile: *profile}
+		} else {
+			warning := nmapUnavailableWarning(*nmapBin)
+			nmapWarning = &warning
+		}
 	}
 
 	report, err := discovery.Run(ctx, opts)
 	if err != nil {
 		return err
+	}
+	if nmapWarning != nil {
+		report.Warnings = append(report.Warnings, *nmapWarning)
+		fmt.Fprintln(os.Stderr, "warning:", nmapWarning.Message)
 	}
 	if *classify {
 		classification, err := runClassification(ctx, *profile, *rulesDir)
@@ -104,6 +143,20 @@ func runScan(args []string) error {
 		}
 		report.AccessClassification = &classification
 	}
+	deviceIntel := deviceintel.Build(report)
+	report.DeviceIntel = &deviceIntel
+	enrichReport(&report, reportEnrichmentOptions{
+		Full:                    *full,
+		Profile:                 *profile,
+		ClassificationRequested: *classify,
+		NmapRequested:           *useNmap,
+		NmapAvailable:           nmapAvailable,
+		IncludeVirtual:          *includeVirtual,
+		RedactionMode:           *redactionMode,
+		MaskPublicIP:            *maskPublicIP,
+		MaskMAC:                 *maskMAC,
+		MaskHostnames:           *maskHostnames,
+	})
 
 	data, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
@@ -152,6 +205,8 @@ func runClassification(ctx context.Context, profile, rulesDir string) (models.Sc
 	mode := models.ModeQuick
 	if profile == "deep" {
 		mode = models.ModeDeep
+	} else if profile == "full" {
+		mode = models.ModeFull
 	}
 	in := models.ScanInput{Mode: mode, Online: true, RulesDir: dir}
 	runner := probes.Runner{Probes: probes.Default(in), Timeout: 12 * time.Second}
@@ -161,6 +216,189 @@ func runClassification(ctx context.Context, profile, rulesDir string) (models.Sc
 		return models.ScanResult{}, err
 	}
 	return engine.Analyze(in, results), nil
+}
+
+func applyFullScanDefaults(profileSet, timeoutSet bool, profile *string, classify, useNmap *bool, timeout *time.Duration) {
+	*classify = true
+	*useNmap = true
+	if !profileSet {
+		*profile = "full"
+	}
+	if !timeoutSet {
+		*timeout = 60 * time.Second
+	}
+}
+
+type reportCapabilityOptions struct {
+	Full                    bool
+	Profile                 string
+	ClassificationRequested bool
+	NmapRequested           bool
+	NmapAvailable           bool
+}
+
+func buildReportCapabilities(report models.ScanReport, opts reportCapabilityOptions) []models.ReportCapability {
+	caps := []models.ReportCapability{
+		{
+			Name:        "full_json_report",
+			Category:    "report",
+			Status:      "completed",
+			OutputPath:  "/",
+			Description: "Single JSON document containing scan metadata, topology, evidence, warnings, device intelligence, optional access classification, and this capability manifest.",
+		},
+		{
+			Name:        "interface_inventory",
+			Category:    "topology",
+			Status:      "completed",
+			OutputPath:  "/agent/interfaces",
+			Description: "Lists local interfaces, selected scan interface, addresses, gateway, and DNS context.",
+		},
+		{
+			Name:        "topology_scan",
+			Category:    "topology",
+			Status:      "completed",
+			OutputPath:  "/devices,/edges,/evidence,/summary",
+			Description: "Builds the evidence-backed LAN device and topology view inside the validated scope.",
+		},
+		{
+			Name:        "tcp_lan_sweep",
+			Category:    "topology",
+			Status:      "completed",
+			OutputPath:  "/devices",
+			Description: fmt.Sprintf("Uses the %s profile to discover live hosts and common open services.", opts.Profile),
+		},
+	}
+
+	if report.DeviceIntel != nil {
+		caps = append(caps, models.ReportCapability{
+			Name:        "device_intelligence",
+			Category:    "device_intel",
+			Status:      "completed",
+			OutputPath:  "/device_intel",
+			Description: "Normalizes discovered devices into inventory, service, risk, OS, vendor, and UI-oriented records.",
+		})
+	} else {
+		caps = append(caps, models.ReportCapability{
+			Name:       "device_intelligence",
+			Category:   "device_intel",
+			Status:     "skipped",
+			OutputPath: "/device_intel",
+			Reason:     "device intelligence section was not built for this run",
+		})
+	}
+
+	switch {
+	case opts.NmapRequested && opts.NmapAvailable:
+		caps = append(caps, models.ReportCapability{
+			Name:        "nmap_service_discovery",
+			Category:    "optional_tool",
+			Status:      "completed",
+			OutputPath:  "/devices/services",
+			Description: "Optional Nmap TCP connect service discovery was enabled and merged into device services.",
+		})
+	case opts.NmapRequested:
+		caps = append(caps, models.ReportCapability{
+			Name:       "nmap_service_discovery",
+			Category:   "optional_tool",
+			Status:     "unavailable",
+			OutputPath: "/warnings",
+			Reason:     "Nmap was requested but no usable nmap binary was found",
+		})
+	default:
+		caps = append(caps, models.ReportCapability{
+			Name:     "nmap_service_discovery",
+			Category: "optional_tool",
+			Status:   "skipped",
+			Reason:   "enable with --nmap or --full",
+		})
+	}
+
+	if report.AccessClassification == nil {
+		cap := models.ReportCapability{
+			Name:     "access_classification",
+			Category: "access_detection",
+			Status:   "skipped",
+			Reason:   "enable with --classify or --full",
+		}
+		if opts.ClassificationRequested {
+			cap.Reason = "access classification was requested but no classification section was attached"
+		}
+		caps = append(caps, cap)
+		return caps
+	}
+
+	caps = append(caps, models.ReportCapability{
+		Name:        "access_classification",
+		Category:    "access_detection",
+		Status:      "completed",
+		OutputPath:  "/access_classification",
+		Description: "Runs access-type probes and the scoring engine for DSL/VDSL/Fiber/Cable/WISP/Mobile/Satellite/Enterprise candidates.",
+	})
+	if report.AccessClassification.ModemCollection != nil {
+		caps = append(caps, models.ReportCapability{
+			Name:        "modem_collection",
+			Category:    "access_detection",
+			Status:      "completed",
+			OutputPath:  "/access_classification/modem_collection",
+			Description: "Collects CPE candidates, gateway chain, NAT state, WAN evidence, and missing physical proof in one section.",
+		})
+	}
+	for i, result := range report.AccessClassification.Evidence {
+		caps = append(caps, models.ReportCapability{
+			Name:       result.ProbeName,
+			Category:   "access_probe",
+			Status:     capabilityStatusFromProbe(result),
+			OutputPath: fmt.Sprintf("/access_classification/evidence/%d", i),
+			Reason:     capabilityReasonFromProbe(result),
+		})
+	}
+	if opts.Full {
+		caps = append(caps, models.ReportCapability{
+			Name:        "full_mode",
+			Category:    "report",
+			Status:      "completed",
+			Description: "The --full flag enabled deep profiling, access classification, device intelligence, Nmap when available, and all JSON report sections.",
+		})
+	}
+	return caps
+}
+
+func capabilityStatusFromProbe(result models.ProbeResult) string {
+	switch result.Status {
+	case models.StatusSuccess:
+		return "completed"
+	case models.StatusFailed:
+		return "failed"
+	case models.StatusSkipped:
+		return "skipped"
+	default:
+		if result.Status != "" {
+			return result.Status
+		}
+		return "unknown"
+	}
+}
+
+func capabilityReasonFromProbe(result models.ProbeResult) string {
+	if len(result.Errors) > 0 {
+		return strings.Join(result.Errors, "; ")
+	}
+	if result.Status == models.StatusSkipped && len(result.Hints) > 0 {
+		return strings.Join(result.Hints, "; ")
+	}
+	return ""
+}
+
+func nmapUnavailableWarning(binary string) models.Warning {
+	message := "--nmap was requested, but nmap was not found in PATH. Install Nmap or pass --nmap-bin <path>; continuing without Nmap service discovery."
+	if binary != "" {
+		message = fmt.Sprintf("--nmap was requested, but the configured Nmap binary %q was not found; continuing without Nmap service discovery.", binary)
+	}
+	return models.Warning{
+		Code:     "nmap_unavailable",
+		Severity: models.SeverityWarning,
+		Message:  message,
+	}
 }
 
 func resolveRulesDir(flagDir string) (string, error) {
@@ -182,35 +420,4 @@ func resolveRulesDir(flagDir string) (string, error) {
 		}
 	}
 	return "", fatalf("could not locate rules directory; pass --rules <dir>")
-}
-
-type nmapService struct {
-	runner  nmap.Runner
-	profile string
-}
-
-func (s nmapService) Available() bool {
-	return s.runner.Available()
-}
-
-func (s nmapService) Scan(ctx context.Context, scope models.ScanScope) ([]discovery.ScannedHost, error) {
-	hosts, err := s.runner.Scan(ctx, scope.CIDR, s.profile)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]discovery.ScannedHost, 0, len(hosts))
-	for _, h := range hosts {
-		sh := discovery.ScannedHost{IP: h.IP, MAC: h.MAC, Hostname: h.Hostname}
-		for _, p := range h.Ports {
-			sh.Services = append(sh.Services, models.Service{
-				Port:     p.ID,
-				Protocol: p.Protocol,
-				State:    "open",
-				Name:     p.Service,
-				Product:  p.Product,
-			})
-		}
-		out = append(out, sh)
-	}
-	return out, nil
 }

@@ -1,0 +1,540 @@
+{
+  "schema_version": "iad.device_intel/v1",
+  "scan_id": "example-current-scan",
+  "created_at": "2026-06-16T12:00:00Z",
+  "scope": {
+    "cidr": "192.168.31.0/24",
+    "interface": "Ethernet",
+    "agent_ip": "192.168.31.147",
+    "default_gateway": "192.168.31.1",
+    "private_only": true,
+    "public_allowed": false,
+    "profile": "deep_device_intel"
+  },
+  "summary": {
+    "device_count": 4,
+    "gateway_count": 2,
+    "unknown_device_count": 1,
+    "service_count": 9,
+    "high_confidence_devices": 2,
+    "inferred_edges": 3,
+    "physical_edges": 0,
+    "security_finding_count": 6
+  },
+  "devices": [
+    {
+      "id": "dev-192.168.1.1",
+      "ip_addresses": ["192.168.1.1"],
+      "mac_addresses": [],
+      "hostnames": [],
+      "vendor": {
+        "oui_vendor": null,
+        "fingerprint_vendor": null,
+        "confidence": 0
+      },
+      "roles": ["possible_cpe", "upstream_private_gateway"],
+      "device_type": {
+        "primary": "upstream_gateway_cpe_candidate",
+        "candidates": [
+          {
+            "type": "upstream_gateway_cpe_candidate",
+            "confidence": 0.6,
+            "supporting_facts": ["A later RFC1918 hop was observed after the default gateway."],
+            "missing_evidence": ["No direct CPE login, SNMP, TR-064/TR-181, UPnP WAN, DSL, DOCSIS, or optical evidence was collected."],
+            "evidence_ids": ["traceroute_probe"]
+          }
+        ],
+        "missing_evidence": ["No direct CPE login, SNMP, TR-064/TR-181, UPnP WAN, DSL, DOCSIS, or optical evidence was collected."],
+        "confidence": 0.6,
+        "evidence_ids": ["traceroute_probe"]
+      },
+      "os_guess": {
+        "family": "unknown",
+        "name": null,
+        "version": null,
+        "confidence": 0,
+        "evidence": ["No safe OS-specific protocol evidence was conclusive."]
+      },
+      "services": [],
+      "smb_info": null,
+      "printer_info": null,
+      "upnp_info": null,
+      "snmp_info": {
+        "enabled": false,
+        "status": "skipped",
+        "reason": "SNMP requires explicit opt-in credentials."
+      },
+      "lldp_cdp_info": null,
+      "security_posture": {
+        "risk_level": "unknown",
+        "notes": []
+      },
+      "topology": {
+        "edge_hints": [
+          {
+            "edge_id": "di-edge-upstream-1",
+            "type": "upstream_private_gateway",
+            "peer": "dev-192.168.31.1",
+            "confidence": 0.65,
+            "confidence_label": "medium",
+            "evidence_ids": ["traceroute_probe"]
+          }
+        ],
+        "is_gateway": false,
+        "is_agent": false,
+        "is_upstream_gateway_candidate": true,
+        "physical_adjacency_proven": false,
+        "inferred_only": true
+      },
+      "confidence": 0.65,
+      "evidence_ids": ["traceroute_probe"],
+      "last_seen": "2026-06-16T12:00:00Z",
+      "classification_explanation": ["A later RFC1918 hop was observed after the default gateway."],
+      "undetermined_without_credentials_or_physical_evidence": [
+        "WAN access type cannot be known without direct physical-layer evidence or opt-in CPE telemetry.",
+        "Router model cannot be trusted from generic HTTP server headers alone."
+      ]
+    },
+    {
+      "id": "dev-192.168.31.1",
+      "ip_addresses": ["192.168.31.1"],
+      "mac_addresses": ["50:88:11:a4:e9:1f"],
+      "hostnames": [],
+      "vendor": {
+        "oui_vendor": null,
+        "fingerprint_vendor": null,
+        "confidence": 0
+      },
+      "roles": ["gateway", "management_interface", "name_resolution", "router"],
+      "device_type": {
+        "primary": "gateway_router",
+        "candidates": [
+          {
+            "type": "gateway_router",
+            "confidence": 0.82,
+            "supporting_facts": ["Default route points to this device and router-like services are open."],
+            "missing_evidence": ["No authenticated router telemetry or physical WAN interface evidence was collected."],
+            "evidence_ids": ["ev-gateway-route", "ev-gateway-mac", "ev-gateway-tcp", "http_fingerprint_v2"]
+          }
+        ],
+        "missing_evidence": ["No authenticated router telemetry or physical WAN interface evidence was collected."],
+        "confidence": 0.82,
+        "evidence_ids": ["ev-gateway-route", "ev-gateway-mac", "ev-gateway-tcp", "http_fingerprint_v2"]
+      },
+      "os_guess": {
+        "family": "unknown",
+        "name": null,
+        "version": null,
+        "confidence": 0,
+        "evidence": ["No safe OS-specific protocol evidence was conclusive."]
+      },
+      "services": [
+        {"port": 53, "protocol": "tcp", "state": "open", "name": "domain", "confidence": 0.8, "evidence_ids": ["ev-gateway-tcp"]},
+        {"port": 80, "protocol": "tcp", "state": "open", "name": "http", "confidence": 0.8, "evidence_ids": ["ev-gateway-tcp"]},
+        {"port": 443, "protocol": "tcp", "state": "open", "name": "https", "confidence": 0.8, "evidence_ids": ["ev-gateway-tcp"]},
+        {"port": 8443, "protocol": "tcp", "state": "open", "name": "https-alt", "confidence": 0.8, "evidence_ids": ["ev-gateway-tcp"]}
+      ],
+      "http_fingerprints": [
+        {
+          "source": "http_fingerprint_v2",
+          "url": "http://192.168.31.1/",
+          "method": "GET",
+          "status_code": 200,
+          "server_header": "nginx",
+          "favicon_hash": "252c9ce330c5f06d",
+          "evidence_id": "http_fingerprint_v2"
+        }
+      ],
+      "smb_info": null,
+      "printer_info": null,
+      "upnp_info": null,
+      "snmp_info": {
+        "enabled": false,
+        "status": "skipped",
+        "reason": "SNMP requires explicit opt-in credentials."
+      },
+      "lldp_cdp_info": null,
+      "security_posture": {
+        "risk_level": "medium",
+        "findings": [
+          {
+            "id": "open_http_management",
+            "severity": "medium",
+            "title": "HTTP management interface possible",
+            "description": "A router/CPE candidate exposes an unencrypted HTTP service.",
+            "evidence_ids": ["ev-gateway-tcp"],
+            "safe_recommendation": "Use HTTPS for management where possible and keep router firmware current."
+          }
+        ],
+        "notes": ["Generic nginx does not prove device model."]
+      },
+      "topology": {
+        "edge_hints": [
+          {
+            "edge_id": "edge-default-gateway",
+            "type": "default_gateway_route",
+            "peer": "dev-192.168.31.147",
+            "confidence": 0.6,
+            "confidence_label": "medium",
+            "evidence_ids": ["ev-gateway-route"]
+          },
+          {
+            "edge_id": "di-edge-upstream-1",
+            "type": "upstream_private_gateway",
+            "peer": "dev-192.168.1.1",
+            "confidence": 0.65,
+            "confidence_label": "medium",
+            "evidence_ids": ["traceroute_probe"]
+          }
+        ],
+        "is_gateway": true,
+        "is_agent": false,
+        "is_upstream_gateway_candidate": false,
+        "physical_adjacency_proven": false,
+        "inferred_only": true
+      },
+      "confidence": 0.9,
+      "evidence_ids": ["ev-gateway-route", "ev-gateway-mac", "ev-gateway-tcp", "http_fingerprint_v2", "traceroute_probe"],
+      "failed_attempts": [
+        {
+          "source": "http_fingerprint_v3",
+          "target": "192.168.31.1",
+          "protocol": "tcp",
+          "port": 80,
+          "url": "http://192.168.31.1/",
+          "method": "GET",
+          "error": "timeout",
+          "timeout": true,
+          "evidence_id": "http_fingerprint_v3"
+        }
+      ],
+      "last_seen": "2026-06-16T12:00:00Z",
+      "classification_explanation": [
+        "Default route points to this device and router-like services are open.",
+        "Generic nginx Server header is web-server evidence only; it does not identify router model, WAN type, or physical access."
+      ],
+      "undetermined_without_credentials_or_physical_evidence": [
+        "WAN access type cannot be known without direct physical-layer evidence or opt-in CPE telemetry.",
+        "Router model cannot be trusted from generic HTTP server headers alone."
+      ]
+    },
+    {
+      "id": "dev-192.168.31.147",
+      "ip_addresses": ["192.168.31.147"],
+      "mac_addresses": [],
+      "hostnames": [],
+      "vendor": {
+        "oui_vendor": null,
+        "fingerprint_vendor": null,
+        "confidence": 0
+      },
+      "roles": ["agent"],
+      "device_type": {
+        "primary": "windows_pc_or_server",
+        "candidates": [
+          {
+            "type": "windows_pc_or_server",
+            "confidence": 0.74,
+            "supporting_facts": ["SMB/NetBIOS/WSD Windows-style services are open."],
+            "missing_evidence": ["Authenticated SMB details and shares were not enumerated."],
+            "evidence_ids": ["ev-agent-tcp"]
+          }
+        ],
+        "missing_evidence": ["Authenticated SMB details and shares were not enumerated."],
+        "confidence": 0.74,
+        "evidence_ids": ["ev-agent-tcp"]
+      },
+      "os_guess": {
+        "family": "windows",
+        "name": "Windows candidate",
+        "version": null,
+        "confidence": 0.72,
+        "evidence": ["SMB/NetBIOS/WSD Windows-style services were observed."],
+        "evidence_ids": ["ev-agent-tcp"]
+      },
+      "services": [
+        {"port": 80, "protocol": "tcp", "state": "open", "name": "http", "confidence": 0.75, "evidence_ids": ["ev-agent-tcp"]},
+        {"port": 135, "protocol": "tcp", "state": "open", "name": "msrpc", "confidence": 0.75, "evidence_ids": ["ev-agent-tcp"]},
+        {"port": 139, "protocol": "tcp", "state": "open", "name": "netbios-ssn", "confidence": 0.75, "evidence_ids": ["ev-agent-tcp"]},
+        {"port": 445, "protocol": "tcp", "state": "open", "name": "microsoft-ds", "confidence": 0.75, "evidence_ids": ["ev-agent-tcp"]},
+        {"port": 5357, "protocol": "tcp", "state": "open", "name": "wsdapi", "confidence": 0.75, "evidence_ids": ["ev-agent-tcp"]}
+      ],
+      "smb_info": {
+        "os_family": "unknown",
+        "evidence_ids": ["ev-agent-tcp"]
+      },
+      "printer_info": null,
+      "upnp_info": null,
+      "snmp_info": {
+        "enabled": false,
+        "status": "skipped",
+        "reason": "SNMP requires explicit opt-in credentials."
+      },
+      "lldp_cdp_info": null,
+      "security_posture": {
+        "risk_level": "medium",
+        "findings": [
+          {
+            "id": "open_smb",
+            "severity": "medium",
+            "title": "SMB port open",
+            "description": "TCP/445 is open on this LAN host.",
+            "evidence_ids": ["ev-agent-tcp"],
+            "safe_recommendation": "Keep file sharing disabled if not needed and restrict it to trusted LAN profiles."
+          },
+          {
+            "id": "many_services_on_agent",
+            "severity": "info",
+            "title": "Many services open on agent host",
+            "description": "5 open services were observed on the scanning host.",
+            "evidence_ids": ["ev-agent-tcp"],
+            "safe_recommendation": "Review local services and disable unused listeners."
+          }
+        ]
+      },
+      "topology": {
+        "edge_hints": [
+          {
+            "edge_id": "edge-default-gateway",
+            "type": "default_gateway_route",
+            "peer": "dev-192.168.31.1",
+            "confidence": 0.6,
+            "confidence_label": "medium",
+            "evidence_ids": ["ev-gateway-route"]
+          },
+          {
+            "edge_id": "edge-unknown-lan",
+            "type": "same_subnet_inferred",
+            "peer": "dev-192.168.31.157",
+            "confidence": 0.35,
+            "confidence_label": "low",
+            "evidence_ids": ["ev-unknown-mac"]
+          }
+        ],
+        "is_gateway": false,
+        "is_agent": true,
+        "is_upstream_gateway_candidate": false,
+        "physical_adjacency_proven": false,
+        "inferred_only": true
+      },
+      "confidence": 0.95,
+      "evidence_ids": ["ev-agent-tcp"],
+      "last_seen": "2026-06-16T12:00:00Z",
+      "classification_explanation": ["SMB/NetBIOS/WSD Windows-style services are open."]
+    },
+    {
+      "id": "dev-192.168.31.157",
+      "ip_addresses": ["192.168.31.157"],
+      "mac_addresses": ["aa:bb:cc:dd:ee:ff"],
+      "hostnames": [],
+      "vendor": {
+        "oui_vendor": null,
+        "fingerprint_vendor": null,
+        "confidence": 0
+      },
+      "roles": ["host", "unknown_host"],
+      "device_type": {
+        "primary": "unknown",
+        "missing_evidence": ["Only IP/MAC or generic reachability was observed; no service, OS, model, or protocol identity evidence was conclusive."],
+        "confidence": 0
+      },
+      "os_guess": {
+        "family": "unknown",
+        "name": null,
+        "version": null,
+        "confidence": 0,
+        "evidence": ["No safe OS-specific protocol evidence was conclusive."]
+      },
+      "services": [],
+      "smb_info": null,
+      "printer_info": null,
+      "upnp_info": null,
+      "snmp_info": {
+        "enabled": false,
+        "status": "skipped",
+        "reason": "SNMP requires explicit opt-in credentials."
+      },
+      "lldp_cdp_info": null,
+      "security_posture": {
+        "risk_level": "low",
+        "findings": [
+          {
+            "id": "unknown_device",
+            "severity": "low",
+            "title": "Unknown device on LAN",
+            "description": "The device was observed but did not expose enough safe identity evidence for classification.",
+            "evidence_ids": ["ev-unknown-mac"],
+            "safe_recommendation": "Confirm the device belongs on this network."
+          }
+        ]
+      },
+      "topology": {
+        "edge_hints": [
+          {
+            "edge_id": "edge-unknown-lan",
+            "type": "same_subnet_inferred",
+            "peer": "dev-192.168.31.147",
+            "confidence": 0.35,
+            "confidence_label": "low",
+            "evidence_ids": ["ev-unknown-mac"]
+          }
+        ],
+        "is_gateway": false,
+        "is_agent": false,
+        "is_upstream_gateway_candidate": false,
+        "physical_adjacency_proven": false,
+        "inferred_only": true
+      },
+      "confidence": 0.55,
+      "evidence_ids": ["ev-unknown-mac"],
+      "last_seen": "2026-06-16T12:00:00Z",
+      "classification_explanation": ["Insufficient strong device-specific evidence; classification remains conservative."]
+    }
+  ],
+  "edges": [
+    {
+      "id": "di-edge-upstream-1",
+      "source": "dev-192.168.31.1",
+      "target": "dev-192.168.1.1",
+      "type": "upstream_private_gateway",
+      "confidence": 0.65,
+      "confidence_label": "medium",
+      "evidence_ids": ["traceroute_probe"],
+      "reason": "Traceroute observed a later private gateway after the default gateway; this is a path hint, not physical cabling proof.",
+      "inferred": true,
+      "physical": false
+    },
+    {
+      "id": "edge-default-gateway",
+      "source": "dev-192.168.31.147",
+      "target": "dev-192.168.31.1",
+      "type": "default_gateway_route",
+      "confidence": 0.6,
+      "confidence_label": "medium",
+      "evidence_ids": ["ev-gateway-route"],
+      "reason": "Default route points to gateway 192.168.31.1.",
+      "inferred": true,
+      "physical": false
+    },
+    {
+      "id": "edge-unknown-lan",
+      "source": "dev-192.168.31.147",
+      "target": "dev-192.168.31.157",
+      "type": "same_subnet_inferred",
+      "confidence": 0.35,
+      "confidence_label": "low",
+      "evidence_ids": ["ev-unknown-mac"],
+      "reason": "Device is in the same private subnet; physical adjacency is not proven.",
+      "inferred": true,
+      "physical": false
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev-gateway-route",
+      "device_id": "dev-192.168.31.1",
+      "source_probe": "gateway_probe",
+      "kind": "gateway_route",
+      "raw": {"gateway": "192.168.31.1"},
+      "confidence": 0.85,
+      "timestamp": "2026-06-16T12:00:00Z",
+      "safe_to_display": true
+    },
+    {
+      "id": "ev-gateway-mac",
+      "device_id": "dev-192.168.31.1",
+      "source_probe": "arp_table",
+      "kind": "arp_table",
+      "raw": {"ip": "192.168.31.1", "mac": "50:88:11:a4:e9:1f"},
+      "confidence": 0.65,
+      "timestamp": "2026-06-16T12:00:00Z",
+      "safe_to_display": true
+    },
+    {
+      "id": "http_fingerprint_v2",
+      "device_id": "dev-192.168.31.1",
+      "source_probe": "http_fingerprint_v2",
+      "kind": "http_fingerprint",
+      "raw": {"server": "nginx", "favicon_hash": "252c9ce330c5f06d"},
+      "confidence": 0.8,
+      "timestamp": "2026-06-16T12:00:00Z",
+      "safe_to_display": true
+    },
+    {
+      "id": "http_fingerprint_v3",
+      "device_id": "dev-192.168.31.1",
+      "source_probe": "http_fingerprint_v3",
+      "kind": "probe_failure",
+      "raw": {"url": "http://192.168.31.1/", "method": "GET"},
+      "confidence": 0.05,
+      "timestamp": "2026-06-16T12:00:00Z",
+      "error": "timeout",
+      "safe_to_display": true
+    },
+    {
+      "id": "traceroute_probe",
+      "device_id": "dev-192.168.1.1",
+      "source_probe": "traceroute_probe",
+      "kind": "gateway_chain",
+      "raw": {"chain": "192.168.31.1 -> 192.168.1.1 -> public ISP network"},
+      "confidence": 0.65,
+      "timestamp": "2026-06-16T12:00:00Z",
+      "safe_to_display": true
+    }
+  ],
+  "conflicts": [
+    {
+      "field": "gateway_chain_state.internal_double_nat_possible",
+      "values": [
+        {"source": "gateway_chain_probe", "value": false},
+        {"source": "canonical_gateway_chain_state", "value": true}
+      ],
+      "severity": "medium",
+      "effect": "preserve_source_conflict",
+      "resolution": "Positive private-hop evidence is monotonic and is not erased by weaker negative probes."
+    }
+  ],
+  "warnings": [
+    {
+      "code": "classification_not_final",
+      "severity": "info",
+      "message": "Fiber and VDSL are possible from weak context only, not conclusive. Final access classification remains Unknown without Tier 1/Tier 2 physical evidence."
+    }
+  ],
+  "ui": {
+    "headline": "4 private/local devices observed",
+    "badges": ["read-only", "private-scope", "no-login", "no-bruteforce"],
+    "device_cards": [
+      {
+        "device_id": "dev-192.168.31.1",
+        "title": "192.168.31.1",
+        "role": "gateway / management_interface / name_resolution / router",
+        "confidence": 0.9,
+        "open_services": ["domain/53", "http/80", "https/443", "https-alt/8443"],
+        "device_type": "gateway_router",
+        "os_guess": "unknown",
+        "last_seen": "2026-06-16T12:00:00Z",
+        "evidence_sources": ["arp_table", "gateway_probe", "http_fingerprint_v2", "traceroute_probe"],
+        "risk_notes": ["HTTP management interface possible"],
+        "why_this_classification": [
+          "Default route points to this device and router-like services are open.",
+          "Generic nginx Server header is web-server evidence only; it does not identify router model, WAN type, or physical access."
+        ]
+      }
+    ],
+    "topology_notes": [
+      "Same-subnet and default-route links are inferred unless LLDP/CDP/SNMP bridge evidence is present.",
+      "Upstream private gateways are path candidates from traceroute/private-hop evidence, not physical WAN proof."
+    ]
+  },
+  "security_notes": [
+    "Default device intelligence probes are read-only and limited to private/local targets.",
+    "SNMP, SSH, router APIs, TR-064, TR-181, and authenticated APIs require explicit user opt-in credentials.",
+    "No login forms, credential guessing, exploit checks, configuration changes, or print jobs are attempted."
+  ],
+  "undetermined_without_credentials_or_physical_evidence": [
+    "Exact WAN access type requires direct physical-layer CPE evidence or opt-in router/modem telemetry.",
+    "Physical cable or Wi-Fi association topology requires LLDP/CDP/SNMP bridge/FDB or controller data.",
+    "Device model and OS remain Unknown when only generic banners, MAC OUI, latency, PTR, or open ports are observed."
+  ]
+}

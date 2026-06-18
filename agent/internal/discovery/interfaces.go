@@ -74,8 +74,15 @@ func SelectPrimary(ifaces []models.InterfaceInfo, gatewayIP string, includeVirtu
 			continue
 		}
 		score := 0
-		if hasPrivateIPv4(ifc) {
-			score += 2
+		switch {
+		case hasRoutablePrivateIPv4(ifc):
+			// A real RFC1918 LAN (10/8, 172.16/12, 192.168/16): the normal case.
+			score += 4
+		case hasLinkLocalIPv4(ifc):
+			// 169.254/16 (APIPA) means DHCP failed / the link is unconfigured.
+			// Such an interface is a dead end, so it is only ever chosen as a
+			// last resort — never over a routable LAN.
+			score += 1
 		}
 		if gatewayIP != "" && cidrContains(ifc.CIDR, gatewayIP) {
 			score += 10
@@ -115,9 +122,28 @@ func isVirtualName(name string) bool {
 	return false
 }
 
-func hasPrivateIPv4(ifc models.InterfaceInfo) bool {
+// hasRoutablePrivateIPv4 reports whether the interface has an RFC1918 IPv4
+// address (10/8, 172.16/12, 192.168/16). Link-local (169.254/16) is deliberately
+// excluded: it is not a routable LAN and must not look like one when selecting
+// the primary interface.
+func hasRoutablePrivateIPv4(ifc models.InterfaceInfo) bool {
 	for _, a := range ifc.Addresses {
-		if ip := net.ParseIP(a.IP); ip != nil && ip.To4() != nil && isPrivateIP(ip) {
+		ip := net.ParseIP(a.IP)
+		if ip == nil || ip.To4() == nil {
+			continue
+		}
+		if isPrivateIP(ip) && !ip.IsLinkLocalUnicast() {
+			return true
+		}
+	}
+	return false
+}
+
+// hasLinkLocalIPv4 reports whether the interface has only an APIPA (169.254/16)
+// IPv4 address — the signature of a failed DHCP lease or an unconfigured link.
+func hasLinkLocalIPv4(ifc models.InterfaceInfo) bool {
+	for _, a := range ifc.Addresses {
+		if ip := net.ParseIP(a.IP); ip != nil && ip.To4() != nil && ip.IsLinkLocalUnicast() {
 			return true
 		}
 	}

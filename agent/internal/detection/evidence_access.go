@@ -219,41 +219,53 @@ func getPerformanceProfile(ev map[string]any, key string) *models.PerformancePro
 
 func gatewayDeviceFromMap(m map[string]any) models.GatewayDevice {
 	return models.GatewayDevice{
-		IP:           anyString(m["ip"]),
-		Role:         anyString(m["role"]),
-		Reachable:    anyBool(m["reachable"]),
-		HTTPTitle:    anyString(m["http_title"]),
-		ServerHeader: anyString(m["server_header"]),
-		WWWAuthenticate: anyString(m["www_authenticate"]),
-		FaviconHash:  anyString(m["favicon_hash"]),
-		WWWAuthRealm: anyString(m["www_authenticate_realm"]),
-		RedirectLocation: anyString(m["redirect_location"]),
-		RedirectPath: anyString(m["redirect_path"]),
-		TLSCertCN:    anyString(m["tls_cert_cn"]),
-		TLSCertSANs:  anyStrings(m["tls_cert_sans"]),
-		TLSServerName: anyString(m["tls_server_name"]),
-		HTMLMetaGenerator: anyString(m["html_meta_generator"]),
-		LoginLabels:  anyStrings(m["login_labels"]),
-		UPnPFound:    anyBool(m["upnp_found"]),
-		UPnPIGDFound: anyBool(m["upnp_igd_found"]),
-		WANCommonInterfaceFound: anyBool(m["wan_common_interface_found"]),
-		WANAccessType: anyString(m["wan_access_type"]),
-		PhysicalLinkStatus: anyString(m["physical_link_status"]),
-		Layer1UpstreamMaxBitRate: int64(anyFloat(m["layer1_upstream_max_bitrate"])),
+		IP:                         anyString(m["ip"]),
+		Role:                       anyString(m["role"]),
+		ReachableState:             anyString(m["reachable_state"]),
+		Reachable:                  anyBool(m["reachable"]),
+		OpenPorts:                  anyInts(m["open_ports"]),
+		HTTPObservations:           anyHTTPObservations(m["http_observations"]),
+		HTTPTitle:                  anyString(m["http_title"]),
+		ServerHeader:               anyString(m["server_header"]),
+		WWWAuthenticate:            anyString(m["www_authenticate"]),
+		FaviconHash:                anyString(m["favicon_hash"]),
+		WWWAuthRealm:               anyString(m["www_authenticate_realm"]),
+		RedirectLocation:           anyString(m["redirect_location"]),
+		RedirectPath:               anyString(m["redirect_path"]),
+		TLSObservations:            anyTLSObservations(m["tls_observations"]),
+		TLSCertCN:                  anyString(m["tls_cert_cn"]),
+		TLSCertSANs:                anyStrings(m["tls_cert_sans"]),
+		TLSCertIssuer:              anyString(m["tls_cert_issuer"]),
+		TLSServerName:              anyString(m["tls_server_name"]),
+		HTMLMetaGenerator:          anyString(m["html_meta_generator"]),
+		LoginLabels:                anyStrings(m["login_labels"]),
+		UPnPState:                  anyString(m["upnp_state"]),
+		UPnPFound:                  anyBool(m["upnp_found"]),
+		UPnPIGDFound:               anyBool(m["upnp_igd_found"]),
+		WANCommonInterfaceFound:    anyBool(m["wan_common_interface_found"]),
+		WANAccessType:              anyString(m["wan_access_type"]),
+		PhysicalLinkStatus:         anyString(m["physical_link_status"]),
+		Layer1UpstreamMaxBitRate:   int64(anyFloat(m["layer1_upstream_max_bitrate"])),
 		Layer1DownstreamMaxBitRate: int64(anyFloat(m["layer1_downstream_max_bitrate"])),
-		TR064Found:   anyBool(m["tr064_found"]),
-		TR064AuthRequired: anyBool(m["tr064_auth_required"]),
-		TR064Services: anyStrings(m["tr064_services"]),
-		MACVendor:    anyString(m["mac_vendor"]),
-		Model:        anyString(m["model"]),
-		Manufacturer: anyString(m["manufacturer"]),
-		FingerprintID: anyString(m["fingerprint_id"]),
-		AccessHints:  anyStrings(m["access_hints"]),
-		PhysicalHints: anyStrings(m["physical_hints"]),
-		Notes: anyStrings(m["notes"]),
-		DeviceConfidence: anyFloat(m["device_confidence"]),
-		AccessConfidence: anyFloat(m["access_confidence"]),
-		Confidence:   anyFloat(m["confidence"]),
+		TR064State:                 anyString(m["tr064_state"]),
+		TR064Found:                 anyBool(m["tr064_found"]),
+		TR064AuthRequired:          anyBool(m["tr064_auth_required"]),
+		TR064Services:              anyStrings(m["tr064_services"]),
+		SNMPState:                  anyString(m["snmp_state"]),
+		MACVendor:                  anyString(m["mac_vendor"]),
+		CPEModelGuess:              anyString(m["cpe_model_guess"]),
+		Model:                      anyString(m["model"]),
+		Manufacturer:               anyString(m["manufacturer"]),
+		FingerprintID:              anyString(m["fingerprint_id"]),
+		AccessEvidence:             anyGatewayAccessEvidence(m["access_evidence"]),
+		AccessHints:                anyStrings(m["access_hints"]),
+		PhysicalHints:              anyStrings(m["physical_hints"]),
+		Notes:                      anyStrings(m["notes"]),
+		FailedAttempts:             anyProbeAttempts(m["failed_attempts"]),
+		DeviceConfidence:           anyFloat(m["device_confidence"]),
+		AccessConfidence:           anyFloat(m["access_confidence"]),
+		Confidence:                 anyFloat(m["confidence"]),
+		EvidenceIDs:                anyStrings(m["evidence_ids"]),
 	}
 }
 
@@ -307,6 +319,111 @@ func anyStrings(v any) []string {
 		for _, e := range arr {
 			if s, ok := e.(string); ok {
 				out = append(out, s)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func anyInts(v any) []int {
+	switch arr := v.(type) {
+	case []int:
+		return arr
+	case []any:
+		out := make([]int, 0, len(arr))
+		for _, e := range arr {
+			if n := int(anyFloat(e)); n != 0 {
+				out = append(out, n)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func anyHTTPObservations(v any) []models.HTTPObservation {
+	switch arr := v.(type) {
+	case []models.HTTPObservation:
+		return arr
+	case []any:
+		out := make([]models.HTTPObservation, 0, len(arr))
+		for _, e := range arr {
+			if m, ok := e.(map[string]any); ok {
+				out = append(out, models.HTTPObservation{
+					Source: anyString(m["source"]), URL: anyString(m["url"]), Method: anyString(m["method"]),
+					StatusCode: int(anyFloat(m["status_code"])), Title: anyString(m["title"]),
+					ServerHeader: anyString(m["server_header"]), WWWAuthenticate: anyString(m["www_authenticate"]),
+					WWWAuthRealm: anyString(m["www_authenticate_realm"]), RedirectLocation: anyString(m["redirect_location"]),
+					RedirectPath: anyString(m["redirect_path"]), FaviconHash: anyString(m["favicon_hash"]),
+					HTMLMetaGenerator: anyString(m["html_meta_generator"]), LoginLabels: anyStrings(m["login_labels"]),
+					EvidenceID: anyString(m["evidence_id"]),
+				})
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func anyTLSObservations(v any) []models.TLSObservation {
+	switch arr := v.(type) {
+	case []models.TLSObservation:
+		return arr
+	case []any:
+		out := make([]models.TLSObservation, 0, len(arr))
+		for _, e := range arr {
+			if m, ok := e.(map[string]any); ok {
+				out = append(out, models.TLSObservation{
+					Source: anyString(m["source"]), IP: anyString(m["ip"]), Port: int(anyFloat(m["port"])),
+					CN: anyString(m["cn"]), SANs: anyStrings(m["sans"]), Issuer: anyString(m["issuer"]),
+					ServerName: anyString(m["server_name"]), EvidenceID: anyString(m["evidence_id"]),
+				})
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func anyGatewayAccessEvidence(v any) []models.GatewayAccessEvidence {
+	switch arr := v.(type) {
+	case []models.GatewayAccessEvidence:
+		return arr
+	case []any:
+		out := make([]models.GatewayAccessEvidence, 0, len(arr))
+		for _, e := range arr {
+			if m, ok := e.(map[string]any); ok {
+				out = append(out, models.GatewayAccessEvidence{
+					Source: anyString(m["source"]), Type: anyString(m["type"]), Value: anyString(m["value"]),
+					Strength: anyString(m["strength"]), Confidence: anyFloat(m["confidence"]),
+					Hints: anyStrings(m["hints"]), EvidenceID: anyString(m["evidence_id"]),
+				})
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func anyProbeAttempts(v any) []models.ProbeAttempt {
+	switch arr := v.(type) {
+	case []models.ProbeAttempt:
+		return arr
+	case []any:
+		out := make([]models.ProbeAttempt, 0, len(arr))
+		for _, e := range arr {
+			if m, ok := e.(map[string]any); ok {
+				out = append(out, models.ProbeAttempt{
+					Source: anyString(m["source"]), Target: anyString(m["target"]), Protocol: anyString(m["protocol"]),
+					Port: int(anyFloat(m["port"])), URL: anyString(m["url"]), Method: anyString(m["method"]),
+					Error: anyString(m["error"]), Timeout: anyBool(m["timeout"]), EvidenceID: anyString(m["evidence_id"]),
+				})
 			}
 		}
 		return out

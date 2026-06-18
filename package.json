@@ -1,0 +1,13 @@
+{
+  "name": "tmap",
+  "private": true,
+  "workspaces": [
+    "apps/desktop/frontend"
+  ],
+  "scripts": {
+    "desktop:dev": "npm --workspace iad-console-frontend run dev",
+    "desktop:build": "npm --workspace iad-console-frontend run build",
+    "desktop:typecheck": "npm --workspace iad-console-frontend run typecheck",
+    "desktop:preview": "npm --workspace iad-console-frontend run preview"
+  }
+}

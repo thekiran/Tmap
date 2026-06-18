@@ -75,11 +75,11 @@ const (
 	CatDSL         = "DSL"
 	CatFiber       = "Fiber"
 	CatCable       = "Cable"
-	CatWireless    = "Fixed Wireless"
-	CatMobile      = "Mobile"
+	CatWireless    = "WISP"
+	CatMobile      = "Mobile/FWA"
 	CatSatellite   = "Satellite"
-	CatEthernetWAN = "EthernetWAN"
-	CatEnterprise  = "Enterprise"
+	CatEthernetWAN = "LeasedLine"
+	CatEnterprise  = "LeasedLine"
 	CatUnknown     = "Unknown"
 )
 

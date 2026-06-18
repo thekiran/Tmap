@@ -1,0 +1,1284 @@
+{
+  "schema_version": "iad.topology/v1",
+  "scan_id": "topo_20260616_200249",
+  "created_at": "2026-06-16T17:02:49.9451423Z",
+  "agent": {
+    "version": "0.2.0",
+    "hostname": "DESKTOP-8EO8FMT",
+    "os": "windows",
+    "gateway": "192.168.31.1",
+    "dns_servers": [
+      "8.8.8.8",
+      "9.9.9.9"
+    ],
+    "interfaces": [
+      {
+        "name": "Yerel Ağ Bağlantısı",
+        "up": false,
+        "loopback": false,
+        "virtual": false,
+        "selected": false,
+        "cidr": "169.254.0.0/16",
+        "addresses": [
+          {
+            "ip": "fe80::c22a:c087:b5ac:b75c",
+            "version": 6
+          },
+          {
+            "ip": "169.254.170.9",
+            "version": 4,
+            "cidr": "169.254.0.0/16"
+          }
+        ]
+      },
+      {
+        "name": "Yerel Ağ Bağlantısı 2",
+        "up": false,
+        "loopback": false,
+        "virtual": false,
+        "selected": false,
+        "cidr": "169.254.0.0/16",
+        "addresses": [
+          {
+            "ip": "fe80::c22a:c087:b5ac:b75c",
+            "version": 6
+          },
+          {
+            "ip": "169.254.206.217",
+            "version": 4,
+            "cidr": "169.254.0.0/16"
+          }
+        ]
+      },
+      {
+        "name": "Ethernet 2",
+        "mac": "0a:00:27:00:00:17",
+        "up": true,
+        "loopback": false,
+        "virtual": false,
+        "selected": false,
+        "cidr": "169.254.0.0/16",
+        "addresses": [
+          {
+            "ip": "fe80::7d7d:fdf9:8e3b:eaef",
+            "version": 6
+          },
+          {
+            "ip": "169.254.218.14",
+            "version": 4,
+            "cidr": "169.254.0.0/16"
+          }
+        ]
+      },
+      {
+        "name": "Wi-Fi",
+        "mac": "c0:a5:e8:aa:ce:6d",
+        "up": false,
+        "loopback": false,
+        "virtual": false,
+        "selected": false,
+        "cidr": "169.254.0.0/16",
+        "addresses": [
+          {
+            "ip": "fe80::cd2c:25d9:1eb7:1c8",
+            "version": 6
+          },
+          {
+            "ip": "169.254.84.67",
+            "version": 4,
+            "cidr": "169.254.0.0/16"
+          }
+        ]
+      },
+      {
+        "name": "Yerel Ağ Bağlantısı* 9",
+        "mac": "c0:a5:e8:aa:ce:6e",
+        "up": false,
+        "loopback": false,
+        "virtual": false,
+        "selected": false,
+        "cidr": "169.254.0.0/16",
+        "addresses": [
+          {
+            "ip": "fe80::c25:cc4e:bb8c:298a",
+            "version": 6
+          },
+          {
+            "ip": "169.254.40.204",
+            "version": 4,
+            "cidr": "169.254.0.0/16"
+          }
+        ]
+      },
+      {
+        "name": "Yerel Ağ Bağlantısı* 11",
+        "mac": "c2:a5:e8:aa:ce:6d",
+        "up": false,
+        "loopback": false,
+        "virtual": false,
+        "selected": false,
+        "cidr": "169.254.0.0/16",
+        "addresses": [
+          {
+            "ip": "fe80::5b19:13f1:12df:ec12",
+            "version": 6
+          },
+          {
+            "ip": "169.254.206.163",
+            "version": 4,
+            "cidr": "169.254.0.0/16"
+          }
+        ]
+      },
+      {
+        "name": "Ethernet",
+        "mac": "74:d4:dd:39:04:66",
+        "up": true,
+        "loopback": false,
+        "virtual": false,
+        "selected": true,
+        "cidr": "192.168.31.0/24",
+        "addresses": [
+          {
+            "ip": "2606:4700:110:8ae5:6024:7fc7:1fa3:18d2",
+            "version": 6
+          },
+          {
+            "ip": "fe80::c9e9:846:230a:4ba0",
+            "version": 6
+          },
+          {
+            "ip": "192.168.31.147",
+            "version": 4,
+            "cidr": "192.168.31.0/24"
+          }
+        ]
+      },
+      {
+        "name": "VMware Network Adapter VMnet1",
+        "mac": "00:50:56:c0:00:01",
+        "up": true,
+        "loopback": false,
+        "virtual": true,
+        "selected": false,
+        "cidr": "169.254.0.0/16",
+        "addresses": [
+          {
+            "ip": "fe80::6ab8:3fbf:6806:5221",
+            "version": 6
+          },
+          {
+            "ip": "169.254.76.39",
+            "version": 4,
+            "cidr": "169.254.0.0/16"
+          }
+        ]
+      },
+      {
+        "name": "VMware Network Adapter VMnet8",
+        "mac": "00:50:56:c0:00:08",
+        "up": true,
+        "loopback": false,
+        "virtual": true,
+        "selected": false,
+        "cidr": "169.254.0.0/16",
+        "addresses": [
+          {
+            "ip": "fe80::cc82:14c2:2b16:22d1",
+            "version": 6
+          },
+          {
+            "ip": "169.254.162.246",
+            "version": 4,
+            "cidr": "169.254.0.0/16"
+          }
+        ]
+      },
+      {
+        "name": "Bluetooth Ağ Bağlantısı",
+        "mac": "c0:a5:e8:aa:ce:71",
+        "up": false,
+        "loopback": false,
+        "virtual": true,
+        "selected": false,
+        "cidr": "169.254.0.0/16",
+        "addresses": [
+          {
+            "ip": "fe80::dd75:69d:29b1:4508",
+            "version": 6
+          },
+          {
+            "ip": "169.254.233.246",
+            "version": 4,
+            "cidr": "169.254.0.0/16"
+          }
+        ]
+      },
+      {
+        "name": "Loopback Pseudo-Interface 1",
+        "up": true,
+        "loopback": true,
+        "virtual": true,
+        "selected": false,
+        "addresses": [
+          {
+            "ip": "::1",
+            "version": 6
+          },
+          {
+            "ip": "127.0.0.1",
+            "version": 4
+          }
+        ]
+      }
+    ]
+  },
+  "scope": {
+    "requested": "auto",
+    "cidr": "192.168.31.0/24",
+    "interface": "Ethernet",
+    "host_count": 254,
+    "private": true,
+    "public_allowed": false,
+    "profile": "deep"
+  },
+  "devices": [
+    {
+      "id": "dev-192.168.31.1",
+      "roles": [
+        "gateway",
+        "host"
+      ],
+      "is_gateway": true,
+      "addresses": [
+        {
+          "ip": "192.168.31.1",
+          "version": 4
+        }
+      ],
+      "services": [
+        {
+          "port": 53,
+          "protocol": "tcp",
+          "state": "open",
+          "name": "domain",
+          "evidence_ids": [
+            "ev-3"
+          ]
+        },
+        {
+          "port": 80,
+          "protocol": "tcp",
+          "state": "open",
+          "name": "http",
+          "evidence_ids": [
+            "ev-3"
+          ]
+        },
+        {
+          "port": 443,
+          "protocol": "tcp",
+          "state": "open",
+          "name": "https",
+          "evidence_ids": [
+            "ev-3"
+          ]
+        },
+        {
+          "port": 8443,
+          "protocol": "tcp",
+          "state": "open",
+          "name": "https-alt",
+          "evidence_ids": [
+            "ev-3"
+          ]
+        }
+      ],
+      "confidence": 0.9,
+      "evidence_ids": [
+        "ev-2",
+        "ev-3"
+      ]
+    },
+    {
+      "id": "dev-192.168.31.147",
+      "hostname": "host.docker.internal",
+      "roles": [
+        "agent",
+        "host"
+      ],
+      "is_agent": true,
+      "addresses": [
+        {
+          "ip": "192.168.31.147",
+          "version": 4
+        }
+      ],
+      "interfaces": [
+        {
+          "mac": "74:d4:dd:39:04:66",
+          "ips": [
+            "192.168.31.147"
+          ]
+        }
+      ],
+      "confidence": 1,
+      "evidence_ids": [
+        "ev-4",
+        "ev-5"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-dev-192.168.31.147--dev-192.168.31.1--gw",
+      "source": "dev-192.168.31.147",
+      "target": "dev-192.168.31.1",
+      "type": "gateway_default",
+      "confidence": 0.3,
+      "confidence_label": "low",
+      "evidence_ids": [
+        "ev-2"
+      ],
+      "reason": "The agent's default route points at this gateway; this is the route to the rest of the network, not proof of a direct cable."
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev-1",
+      "kind": "interface",
+      "source": "interface_probe",
+      "summary": "Selected interface Ethernet (192.168.31.147) on 192.168.31.0/24.",
+      "data": {
+        "cidr": "192.168.31.0/24",
+        "interface": "Ethernet",
+        "ip": "192.168.31.147"
+      },
+      "timestamp": "2026-06-16T17:02:50.4233484Z"
+    },
+    {
+      "id": "ev-2",
+      "kind": "gateway_route",
+      "source": "gateway_probe",
+      "summary": "Default route points to gateway 192.168.31.1.",
+      "data": {
+        "gateway": "192.168.31.1"
+      },
+      "timestamp": "2026-06-16T17:02:50.4233484Z"
+    },
+    {
+      "id": "ev-3",
+      "kind": "tcp_connect",
+      "source": "tcp_sweep",
+      "summary": "192.168.31.1 accepted TCP connections on 4 port(s).",
+      "data": {
+        "ip": "192.168.31.1",
+        "ports": "53,80,443,8443"
+      },
+      "timestamp": "2026-06-16T17:03:19.9525981Z"
+    },
+    {
+      "id": "ev-4",
+      "kind": "arp_table",
+      "source": "arp_table",
+      "summary": "192.168.31.147 resolved to MAC 74:d4:dd:39:04:66 in the neighbour table.",
+      "data": {
+        "ip": "192.168.31.147",
+        "mac": "74:d4:dd:39:04:66"
+      },
+      "timestamp": "2026-06-16T17:03:21.2845457Z"
+    },
+    {
+      "id": "ev-5",
+      "kind": "reverse_dns",
+      "source": "reverse_dns",
+      "summary": "192.168.31.147 reverse-resolves to host.docker.internal.",
+      "data": {
+        "hostname": "host.docker.internal",
+        "ip": "192.168.31.147"
+      },
+      "timestamp": "2026-06-16T17:03:21.2855458Z"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "inferred_topology_only",
+      "severity": "info",
+      "message": "Topology is inferred from routing and subnet membership only. No LLDP/CDP/SNMP evidence was available, so physical links are not proven."
+    }
+  ],
+  "summary": {
+    "device_count": 2,
+    "edge_count": 1,
+    "evidence_count": 5,
+    "high_confidence_edges": 0,
+    "inferred_only": true,
+    "profile": "deep",
+    "duration_ms": 31352
+  },
+  "access_classification": {
+    "scan_id": "scan_20260616_200321",
+    "created_at": "2026-06-16T20:03:21.4690647+03:00",
+    "status": "completed",
+    "mode": "deep",
+    "classification": {
+      "primary_type": "Unknown",
+      "subtype": null,
+      "confidence": 0,
+      "decision_quality": "low",
+      "state": "insufficient_evidence",
+      "safe_to_display_as_final": false
+    },
+    "primary_type": "Unknown",
+    "category": "Unknown",
+    "confidence": 0,
+    "classification_confidence": 0,
+    "context_confidence": 0.4,
+    "decision_quality": "low",
+    "uncertainty_reasons": [
+      "No scoreable physical access evidence was collected."
+    ],
+    "detected_network_context": {
+      "cgnat": false,
+      "gateway": "192.168.31.1",
+      "gateway_chain": [
+        "192.168.31.1"
+      ],
+      "double_nat_possible": false,
+      "local_access": "Ethernet",
+      "main_adapter": "Ethernet",
+      "fingerprint_matched": false,
+      "upnp_found": false,
+      "tr064_found": false,
+      "gateway_devices": [
+        {
+          "ip": "192.168.31.1",
+          "role": "default_gateway",
+          "reachable": false,
+          "upnp_found": false,
+          "upnp_igd_found": false,
+          "wan_common_interface_found": false,
+          "tr064_found": false,
+          "tr064_auth_required": false,
+          "device_confidence": 0,
+          "access_confidence": 0,
+          "confidence": 0
+        }
+      ],
+      "access_architecture": {
+        "local_medium": "Ethernet",
+        "ip_architecture": "dual_stack",
+        "nat_topology": "ipv6_only_transition"
+      },
+      "ipv6_context": {
+        "ipv6_available": true,
+        "global_ipv6": true,
+        "default_route": "dual_stack_or_ipv6_default",
+        "dns64_nat64": false
+      },
+      "nat_topology": {
+        "public_ip_matches": false,
+        "cgnat": false,
+        "double_nat": false,
+        "internal_double_nat_possible": false,
+        "external_public_ip_consistent": false,
+        "gateway_nat_control_reachable": false,
+        "pcp_reachable": false,
+        "nat_pmp_reachable": false,
+        "topology": "ipv6_only_transition"
+      },
+      "evidence_strength": {
+        "physical": "none",
+        "device": "weak",
+        "network": "weak",
+        "performance": "none",
+        "regional": "none"
+      }
+    },
+    "scores": {},
+    "alternatives": null,
+    "explanation": [
+      "No UPnP modem model was discovered.",
+      "No TR-064 CPE data was available.",
+      "Without a modem model or WAN physical-layer interface data, DSL/VDSL/Fiber cannot be distinguished conclusively.",
+      "The DSL, VDSL and Fiber scores are too close to each other to classify confidently.",
+      "No strong physical-layer evidence was found, so the access type remains Unknown."
+    ],
+    "confidence_breakdown": {
+      "classification": 0,
+      "context": 0.4,
+      "physical": 0,
+      "device": 0.25,
+      "network": 0.35,
+      "performance": 0,
+      "penalty": 0.35
+    },
+    "next_best_probes": [
+      {
+        "probe_name": "upnp_wan_common_interface_probe",
+        "reason": "WANCommonInterfaceConfig may expose WANAccessType and link properties.",
+        "expected_evidence": [
+          "WANAccessType",
+          "Layer1UpstreamMaxBitRate",
+          "Layer1DownstreamMaxBitRate",
+          "PhysicalLinkStatus"
+        ],
+        "safety": "Local private gateway only. Read-only. No authentication bypass."
+      },
+      {
+        "probe_name": "tr064_probe",
+        "reason": "TR-064 WAN/DSL descriptors can expose DSL/PTM/ATM and link status.",
+        "expected_evidence": [
+          "WANDSLInterfaceConfig",
+          "WANCommonInterfaceConfig",
+          "PTM/ATM link",
+          "VDSL2/ADSL modulation"
+        ],
+        "safety": "Private gateway only. Authenticated calls require user-provided credentials."
+      },
+      {
+        "probe_name": "http_fingerprint_probe",
+        "reason": "A local gateway fingerprint may identify the CPE model.",
+        "expected_evidence": [
+          "HTTP title",
+          "Server header",
+          "WWW-Authenticate realm",
+          "favicon hash",
+          "TLS CN/SAN"
+        ],
+        "safety": "Private gateway HTTP/HTTPS only. No login attempts."
+      },
+      {
+        "probe_name": "snmp_opt_in_probe",
+        "reason": "SNMP can expose ifType/ifDescr and DSL/DOCSIS/optical MIB objects when explicitly enabled.",
+        "expected_evidence": [
+          "IF-MIB ifType",
+          "ifDescr/ifName",
+          "ADSL-LINE-MIB",
+          "VDSL2-LINE-MIB",
+          "DOCSIS MIB",
+          "optical/cellular interfaces"
+        ],
+        "safety": "Disabled by default; requires user-provided read-only credentials. No community guessing."
+      },
+      {
+        "probe_name": "tr181_interface_stack_probe",
+        "reason": "TR-181 InterfaceStack can reveal the physical layer below the IP interface.",
+        "expected_evidence": [
+          "Device.DSL.Line",
+          "Device.PTM.Link",
+          "Device.ATM.Link",
+          "Device.Optical.Interface",
+          "Device.Cellular.Interface",
+          "Device.Ethernet.Link"
+        ],
+        "safety": "Requires supported local management API or user-provided CPE access. Read-only."
+      }
+    ],
+    "evidence_tiers": {
+      "direct_physical": {
+        "status": "missing",
+        "items": null
+      },
+      "device_model": {
+        "status": "missing",
+        "items": null
+      },
+      "topology": {
+        "status": "present_but_weak",
+        "items": [
+          {
+            "source": "gateway_probe",
+            "target_type": "Unknown",
+            "strength": "weak",
+            "confidence": 0.25,
+            "reason": "Default gateway was detected; this is topology context, not WAN physical proof.",
+            "raw": {
+              "gateway": "192.168.31.1"
+            }
+          },
+          {
+            "source": "gateway_chain_probe",
+            "target_type": "Unknown",
+            "strength": "weak",
+            "confidence": 0.35,
+            "reason": "Private gateway chain was detected; this can explain router/CPE placement but not access type.",
+            "raw": {
+              "gateway_chain": [
+                "192.168.31.1"
+              ]
+            }
+          },
+          {
+            "source": "nat_topology",
+            "target_type": "Unknown",
+            "strength": "weak",
+            "confidence": 0.35,
+            "reason": "NAT topology is network context only.",
+            "raw": {
+              "double_nat": false,
+              "topology": "ipv6_only_transition"
+            }
+          }
+        ]
+      },
+      "performance": {
+        "status": "missing",
+        "items": null
+      },
+      "regional": {
+        "status": "missing",
+        "items": null
+      }
+    },
+    "data_quality": {
+      "has_conflicts": false,
+      "conflicts": []
+    },
+    "ui": {
+      "headline": "Access type unknown",
+      "summary": "No direct WAN physical evidence was collected.",
+      "badges": [
+        "Topology context",
+        "No CPE model",
+        "No direct WAN evidence"
+      ],
+      "warnings": [
+        "No scoreable physical access evidence was collected.",
+        "Do not treat latency, PTR, ASN, IPv6, public IP, CGNAT, or Ethernet adapter as proof of access type."
+      ]
+    },
+    "evidence": [
+      {
+        "probe_name": "adapter_probe",
+        "status": "success",
+        "confidence": 0.4,
+        "evidence": {
+          "active": [
+            "Ethernet 2",
+            "Ethernet",
+            "VMware Network Adapter VMnet1",
+            "VMware Network Adapter VMnet8"
+          ],
+          "adapters": [
+            {
+              "name": "Yerel Ağ Bağlantısı",
+              "mac": "",
+              "up": false,
+              "addrs": [
+                "fe80::c22a:c087:b5ac:b75c/64",
+                "169.254.170.9/16"
+              ]
+            },
+            {
+              "name": "Yerel Ağ Bağlantısı 2",
+              "mac": "",
+              "up": false,
+              "addrs": [
+                "fe80::c22a:c087:b5ac:b75c/64",
+                "169.254.206.217/16"
+              ]
+            },
+            {
+              "name": "Ethernet 2",
+              "mac": "0a:00:27:00:00:17",
+              "up": true,
+              "addrs": [
+                "fe80::7d7d:fdf9:8e3b:eaef/64",
+                "169.254.218.14/16"
+              ]
+            },
+            {
+              "name": "Wi-Fi",
+              "mac": "c0:a5:e8:aa:ce:6d",
+              "up": false,
+              "addrs": [
+                "fe80::cd2c:25d9:1eb7:1c8/64",
+                "169.254.84.67/16"
+              ]
+            },
+            {
+              "name": "Yerel Ağ Bağlantısı* 9",
+              "mac": "c0:a5:e8:aa:ce:6e",
+              "up": false,
+              "addrs": [
+                "fe80::c25:cc4e:bb8c:298a/64",
+                "169.254.40.204/16"
+              ]
+            },
+            {
+              "name": "Yerel Ağ Bağlantısı* 11",
+              "mac": "c2:a5:e8:aa:ce:6d",
+              "up": false,
+              "addrs": [
+                "fe80::5b19:13f1:12df:ec12/64",
+                "169.254.206.163/16"
+              ]
+            },
+            {
+              "name": "Ethernet",
+              "mac": "74:d4:dd:39:04:66",
+              "up": true,
+              "addrs": [
+                "2606:4700:110:8ae5:6024:7fc7:1fa3:18d2/128",
+                "fe80::c9e9:846:230a:4ba0/64",
+                "192.168.31.147/24"
+              ]
+            },
+            {
+              "name": "VMware Network Adapter VMnet1",
+              "mac": "00:50:56:c0:00:01",
+              "up": true,
+              "addrs": [
+                "fe80::6ab8:3fbf:6806:5221/64",
+                "169.254.76.39/16"
+              ]
+            },
+            {
+              "name": "VMware Network Adapter VMnet8",
+              "mac": "00:50:56:c0:00:08",
+              "up": true,
+              "addrs": [
+                "fe80::cc82:14c2:2b16:22d1/64",
+                "169.254.162.246/16"
+              ]
+            },
+            {
+              "name": "Bluetooth Ağ Bağlantısı",
+              "mac": "c0:a5:e8:aa:ce:71",
+              "up": false,
+              "addrs": [
+                "fe80::dd75:69d:29b1:4508/64",
+                "169.254.233.246/16"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "probe_name": "gateway_probe",
+        "status": "success",
+        "confidence": 0.3,
+        "evidence": {
+          "gateway": "192.168.31.1"
+        }
+      },
+      {
+        "probe_name": "gateway_chain_probe",
+        "status": "success",
+        "confidence": 0,
+        "evidence": {
+          "double_nat_possible": false,
+          "gateway_chain": [
+            "192.168.31.1"
+          ],
+          "gateway_devices": [
+            {
+              "ip": "192.168.31.1",
+              "role": "default_gateway",
+              "reachable": false,
+              "upnp_found": false,
+              "upnp_igd_found": false,
+              "wan_common_interface_found": false,
+              "tr064_found": false,
+              "tr064_auth_required": false,
+              "device_confidence": 0,
+              "access_confidence": 0,
+              "confidence": 0
+            }
+          ]
+        }
+      },
+      {
+        "probe_name": "dns_probe",
+        "status": "failed",
+        "confidence": 0,
+        "errors": [
+          "context deadline exceeded"
+        ]
+      },
+      {
+        "probe_name": "latency_probe",
+        "status": "failed",
+        "confidence": 0,
+        "evidence": {
+          "target": "1.1.1.1"
+        },
+        "errors": [
+          "latency measurement failed: dial tcp 1.1.1.1:80: i/o timeout"
+        ]
+      },
+      {
+        "probe_name": "upnp_probe",
+        "status": "success",
+        "confidence": 0,
+        "evidence": {
+          "found": false
+        }
+      },
+      {
+        "probe_name": "upnp_igd_probe",
+        "status": "success",
+        "confidence": 0,
+        "evidence": {
+          "igd_wan_common_found": false
+        }
+      },
+      {
+        "probe_name": "upnp_igd_deep_probe",
+        "status": "success",
+        "confidence": 0,
+        "evidence": {
+          "igd_wan_common_found": false
+        }
+      },
+      {
+        "probe_name": "upnp_igd_deep_probe_v2",
+        "status": "success",
+        "confidence": 0,
+        "evidence": {
+          "igd_wan_common_found": false
+        }
+      },
+      {
+        "probe_name": "tr064_probe",
+        "status": "success",
+        "confidence": 0,
+        "evidence": {
+          "access_confidence": 0,
+          "device_confidence": 0,
+          "gateway_candidates": [
+            "192.168.31.1"
+          ],
+          "strong_access_evidence": false,
+          "tr064_found": false,
+          "wan_signals": null
+        }
+      },
+      {
+        "probe_name": "tr064_probe_v2",
+        "status": "success",
+        "confidence": 0,
+        "evidence": {
+          "access_confidence": 0,
+          "device_confidence": 0,
+          "gateway_candidates": [
+            "192.168.31.1"
+          ],
+          "strong_access_evidence": false,
+          "tr064_found": false,
+          "wan_signals": null
+        }
+      },
+      {
+        "probe_name": "http_fingerprint_v2",
+        "status": "success",
+        "confidence": 0,
+        "evidence": {
+          "access_confidence": 0,
+          "device_confidence": 0,
+          "gateway_candidates": [
+            "192.168.31.1"
+          ],
+          "gateway_devices": [
+            {
+              "ip": "192.168.31.1",
+              "role": "default_gateway",
+              "reachable": false,
+              "upnp_found": false,
+              "upnp_igd_found": false,
+              "wan_common_interface_found": false,
+              "tr064_found": false,
+              "tr064_auth_required": false,
+              "device_confidence": 0,
+              "access_confidence": 0,
+              "confidence": 0
+            }
+          ],
+          "strong_access_evidence": false
+        }
+      },
+      {
+        "probe_name": "http_fingerprint_v3",
+        "status": "success",
+        "confidence": 0,
+        "evidence": {
+          "access_confidence": 0,
+          "device_confidence": 0,
+          "gateway_candidates": [
+            "192.168.31.1"
+          ],
+          "gateway_devices": [
+            {
+              "ip": "192.168.31.1",
+              "role": "default_gateway",
+              "reachable": false,
+              "upnp_found": false,
+              "upnp_igd_found": false,
+              "wan_common_interface_found": false,
+              "tr064_found": false,
+              "tr064_auth_required": false,
+              "device_confidence": 0,
+              "access_confidence": 0,
+              "confidence": 0
+            }
+          ],
+          "strong_access_evidence": false
+        }
+      },
+      {
+        "probe_name": "ipv6_transition_probe",
+        "status": "success",
+        "confidence": 0.3,
+        "evidence": {
+          "ip_architecture": "dual_stack",
+          "ipv6_context": {
+            "ipv6_available": true,
+            "global_ipv6": true,
+            "default_route": "dual_stack_or_ipv6_default",
+            "dns64_nat64": false
+          },
+          "network_confidence": 0.3
+        }
+      },
+      {
+        "probe_name": "ipv6_transition_probe_v2",
+        "status": "success",
+        "confidence": 0.3,
+        "evidence": {
+          "ip_architecture": "dual_stack",
+          "ipv6_context": {
+            "ipv6_available": true,
+            "global_ipv6": true,
+            "default_route": "dual_stack_or_ipv6_default",
+            "dns64_nat64": false
+          },
+          "network_confidence": 0.3
+        }
+      },
+      {
+        "probe_name": "stun_pcp_nat_probe",
+        "status": "success",
+        "confidence": 0.35,
+        "evidence": {
+          "gateway": "192.168.31.1",
+          "nat_topology": {
+            "public_ip_matches": false,
+            "cgnat": false,
+            "double_nat": false,
+            "internal_double_nat_possible": false,
+            "external_public_ip_consistent": false,
+            "gateway_nat_control_reachable": false,
+            "pcp_reachable": false,
+            "nat_pmp_reachable": false,
+            "topology": "unknown"
+          },
+          "network_confidence": 0.35
+        }
+      },
+      {
+        "probe_name": "os_interface_probe_v2",
+        "status": "success",
+        "confidence": 0.35,
+        "evidence": {
+          "access_architecture": {
+            "local_medium": "Ethernet"
+          },
+          "active": [
+            "Ethernet 2",
+            "Ethernet",
+            "VMware Network Adapter VMnet1",
+            "VMware Network Adapter VMnet8"
+          ],
+          "adapters": [
+            {
+              "name": "Yerel Ağ Bağlantısı",
+              "mac": "",
+              "up": false,
+              "addrs": [
+                "fe80::c22a:c087:b5ac:b75c/64",
+                "169.254.170.9/16"
+              ]
+            },
+            {
+              "name": "Yerel Ağ Bağlantısı 2",
+              "mac": "",
+              "up": false,
+              "addrs": [
+                "fe80::c22a:c087:b5ac:b75c/64",
+                "169.254.206.217/16"
+              ]
+            },
+            {
+              "name": "Ethernet 2",
+              "mac": "0a:00:27:00:00:17",
+              "up": true,
+              "addrs": [
+                "fe80::7d7d:fdf9:8e3b:eaef/64",
+                "169.254.218.14/16"
+              ]
+            },
+            {
+              "name": "Wi-Fi",
+              "mac": "c0:a5:e8:aa:ce:6d",
+              "up": false,
+              "addrs": [
+                "fe80::cd2c:25d9:1eb7:1c8/64",
+                "169.254.84.67/16"
+              ]
+            },
+            {
+              "name": "Yerel Ağ Bağlantısı* 9",
+              "mac": "c0:a5:e8:aa:ce:6e",
+              "up": false,
+              "addrs": [
+                "fe80::c25:cc4e:bb8c:298a/64",
+                "169.254.40.204/16"
+              ]
+            },
+            {
+              "name": "Yerel Ağ Bağlantısı* 11",
+              "mac": "c2:a5:e8:aa:ce:6d",
+              "up": false,
+              "addrs": [
+                "fe80::5b19:13f1:12df:ec12/64",
+                "169.254.206.163/16"
+              ]
+            },
+            {
+              "name": "Ethernet",
+              "mac": "74:d4:dd:39:04:66",
+              "up": true,
+              "addrs": [
+                "2606:4700:110:8ae5:6024:7fc7:1fa3:18d2/128",
+                "fe80::c9e9:846:230a:4ba0/64",
+                "192.168.31.147/24"
+              ]
+            },
+            {
+              "name": "VMware Network Adapter VMnet1",
+              "mac": "00:50:56:c0:00:01",
+              "up": true,
+              "addrs": [
+                "fe80::6ab8:3fbf:6806:5221/64",
+                "169.254.76.39/16"
+              ]
+            },
+            {
+              "name": "VMware Network Adapter VMnet8",
+              "mac": "00:50:56:c0:00:08",
+              "up": true,
+              "addrs": [
+                "fe80::cc82:14c2:2b16:22d1/64",
+                "169.254.162.246/16"
+              ]
+            },
+            {
+              "name": "Bluetooth Ağ Bağlantısı",
+              "mac": "c0:a5:e8:aa:ce:71",
+              "up": false,
+              "addrs": [
+                "fe80::dd75:69d:29b1:4508/64",
+                "169.254.233.246/16"
+              ]
+            }
+          ],
+          "device_confidence": 0.25
+        }
+      },
+      {
+        "probe_name": "os_interface_probe_v3",
+        "status": "success",
+        "confidence": 0.35,
+        "evidence": {
+          "access_architecture": {
+            "local_medium": "Ethernet"
+          },
+          "active": [
+            "Ethernet 2",
+            "Ethernet",
+            "VMware Network Adapter VMnet1",
+            "VMware Network Adapter VMnet8"
+          ],
+          "adapters": [
+            {
+              "name": "Yerel Ağ Bağlantısı",
+              "mac": "",
+              "up": false,
+              "addrs": [
+                "fe80::c22a:c087:b5ac:b75c/64",
+                "169.254.170.9/16"
+              ]
+            },
+            {
+              "name": "Yerel Ağ Bağlantısı 2",
+              "mac": "",
+              "up": false,
+              "addrs": [
+                "fe80::c22a:c087:b5ac:b75c/64",
+                "169.254.206.217/16"
+              ]
+            },
+            {
+              "name": "Ethernet 2",
+              "mac": "0a:00:27:00:00:17",
+              "up": true,
+              "addrs": [
+                "fe80::7d7d:fdf9:8e3b:eaef/64",
+                "169.254.218.14/16"
+              ]
+            },
+            {
+              "name": "Wi-Fi",
+              "mac": "c0:a5:e8:aa:ce:6d",
+              "up": false,
+              "addrs": [
+                "fe80::cd2c:25d9:1eb7:1c8/64",
+                "169.254.84.67/16"
+              ]
+            },
+            {
+              "name": "Yerel Ağ Bağlantısı* 9",
+              "mac": "c0:a5:e8:aa:ce:6e",
+              "up": false,
+              "addrs": [
+                "fe80::c25:cc4e:bb8c:298a/64",
+                "169.254.40.204/16"
+              ]
+            },
+            {
+              "name": "Yerel Ağ Bağlantısı* 11",
+              "mac": "c2:a5:e8:aa:ce:6d",
+              "up": false,
+              "addrs": [
+                "fe80::5b19:13f1:12df:ec12/64",
+                "169.254.206.163/16"
+              ]
+            },
+            {
+              "name": "Ethernet",
+              "mac": "74:d4:dd:39:04:66",
+              "up": true,
+              "addrs": [
+                "2606:4700:110:8ae5:6024:7fc7:1fa3:18d2/128",
+                "fe80::c9e9:846:230a:4ba0/64",
+                "192.168.31.147/24"
+              ]
+            },
+            {
+              "name": "VMware Network Adapter VMnet1",
+              "mac": "00:50:56:c0:00:01",
+              "up": true,
+              "addrs": [
+                "fe80::6ab8:3fbf:6806:5221/64",
+                "169.254.76.39/16"
+              ]
+            },
+            {
+              "name": "VMware Network Adapter VMnet8",
+              "mac": "00:50:56:c0:00:08",
+              "up": true,
+              "addrs": [
+                "fe80::cc82:14c2:2b16:22d1/64",
+                "169.254.162.246/16"
+              ]
+            },
+            {
+              "name": "Bluetooth Ağ Bağlantısı",
+              "mac": "c0:a5:e8:aa:ce:71",
+              "up": false,
+              "addrs": [
+                "fe80::dd75:69d:29b1:4508/64",
+                "169.254.233.246/16"
+              ]
+            }
+          ],
+          "device_confidence": 0.25
+        }
+      },
+      {
+        "probe_name": "lldp_cdp_passive_probe",
+        "status": "success",
+        "confidence": 0.2,
+        "evidence": {
+          "access_confidence": 0,
+          "frames": null,
+          "network_confidence": 0.2
+        }
+      },
+      {
+        "probe_name": "lldp_cdp_passive_probe_v2",
+        "status": "success",
+        "confidence": 0.2,
+        "evidence": {
+          "access_confidence": 0,
+          "frames": null,
+          "network_confidence": 0.2
+        }
+      },
+      {
+        "probe_name": "performance_profile_probe",
+        "status": "failed",
+        "confidence": 0,
+        "errors": [
+          "latency measurement failed: dial tcp 1.1.1.1:80: i/o timeout"
+        ]
+      },
+      {
+        "probe_name": "performance_profile_probe_v2",
+        "status": "failed",
+        "confidence": 0,
+        "errors": [
+          "latency measurement failed: dial tcp 1.1.1.1:80: i/o timeout"
+        ]
+      },
+      {
+        "probe_name": "snmp_probe_opt_in",
+        "status": "skipped",
+        "confidence": 0,
+        "evidence": {
+          "enabled": false,
+          "reason": "SNMP is disabled by default and requires explicit user-provided read-only credentials.",
+          "safety": "No community guessing, brute force, credential collection, or public IP probing is performed."
+        }
+      },
+      {
+        "probe_name": "gateway_reachability_diagnostics_probe",
+        "status": "success",
+        "confidence": 0.35,
+        "evidence": {
+          "gateway_ip": "192.168.31.1",
+          "management_reachable": false,
+          "network_confidence": 0.35,
+          "reason_if_unreachable": "The gateway is present in the route table, but no tested management TCP port responded. This does not prove the gateway is unreachable.",
+          "route_present": true,
+          "tcp_ports_reachable": []
+        }
+      },
+      {
+        "probe_name": "public_ip_probe",
+        "status": "failed",
+        "confidence": 0,
+        "errors": [
+          "Get \"https://icanhazip.com\": context deadline exceeded"
+        ]
+      },
+      {
+        "probe_name": "traceroute_probe",
+        "status": "failed",
+        "confidence": 0,
+        "errors": [
+          "tracert failed: context deadline exceeded"
+        ]
+      },
+      {
+        "probe_name": "asn_probe",
+        "status": "failed",
+        "confidence": 0,
+        "errors": [
+          "Get \"https://icanhazip.com\": context deadline exceeded"
+        ]
+      }
+    ]
+  }
+}

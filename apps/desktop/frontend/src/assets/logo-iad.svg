@@ -1,0 +1,15 @@
+<svg width="132" height="28" viewBox="0 0 132 28" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="IAD">
+  
+  <g stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round">
+    <line x1="14" y1="14" x2="5" y2="6"></line>
+    <line x1="14" y1="14" x2="24" y2="7"></line>
+    <line x1="14" y1="14" x2="7" y2="23"></line>
+    <line x1="14" y1="14" x2="23" y2="22"></line>
+  </g>
+  <circle cx="14" cy="14" r="4.2" fill="currentColor"></circle>
+  <circle cx="5" cy="6" r="2.2" fill="currentColor"></circle>
+  <circle cx="24" cy="7" r="2.2" fill="currentColor"></circle>
+  <circle cx="7" cy="23" r="2.2" fill="currentColor"></circle>
+  <circle cx="23" cy="22" r="2.2" fill="currentColor"></circle>
+  <text x="38" y="20" font-family="&#39;JetBrains Mono&#39;,&#39;SFMono-Regular&#39;,monospace" font-size="19" font-weight="700" letter-spacing="1.5" fill="currentColor">IAD</text>
+</svg>

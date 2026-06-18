@@ -43,12 +43,14 @@ func (r *Runner) Run(ctx context.Context, in models.ScanInput) []models.ProbeRes
 		wg.Add(1)
 		go func(i int, p Probe) {
 			defer wg.Done()
+			start := time.Now()
 			defer func() {
 				if rec := recover(); rec != nil {
 					results[i] = models.ProbeResult{
-						ProbeName: p.Name(),
-						Status:    models.StatusFailed,
-						Errors:    []string{"panic during probe"},
+						ProbeName:  p.Name(),
+						Status:     models.StatusFailed,
+						DurationMS: time.Since(start).Milliseconds(),
+						Errors:     []string{"panic during probe"},
 					}
 				}
 			}()
@@ -62,6 +64,7 @@ func (r *Runner) Run(ctx context.Context, in models.ScanInput) []models.ProbeRes
 				res.Status = models.StatusFailed
 				res.Errors = append(res.Errors, err.Error())
 			}
+			res.DurationMS = time.Since(start).Milliseconds()
 			results[i] = *res
 		}(i, p)
 	}
@@ -87,6 +90,7 @@ func Default(in models.ScanInput) []Probe {
 		TR064ProbeV2{},
 		HTTPFingerprintV2Probe{},
 		HTTPFingerprintV3Probe{},
+		UpstreamPrivateCPEProbe{},
 		IPv6TransitionProbe{},
 		IPv6TransitionProbeV2{},
 		STUNPCPNATProbe{},
@@ -102,7 +106,7 @@ func Default(in models.ScanInput) []Probe {
 	if in.Online {
 		ps = append(ps, PublicIPProbe{})
 	}
-	if in.Mode == models.ModeDeep {
+	if in.Mode == models.ModeDeep || in.Mode == models.ModeFull {
 		ps = append(ps, TracerouteProbe{})
 		if in.Online {
 			ps = append(ps, ASNProbe{})

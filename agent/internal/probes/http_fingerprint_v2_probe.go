@@ -24,10 +24,11 @@ type httpFingerprintV2Funcs struct {
 	gateway    func() (net.IP, error)
 	traceroute func(context.Context, string, int) ([]string, error)
 	fetch      func(context.Context, string) (httpFingerprintV2Result, error)
-	tlsInfo    func(context.Context, string) (string, []string)
+	tlsInfo    func(context.Context, string) (string, []string, string)
 }
 
 type httpFingerprintV2Result struct {
+	StatusCode        int
 	Title             string
 	Server            string
 	WWWAuthenticate   string
@@ -65,9 +66,15 @@ func (p HTTPFingerprintV2Probe) Run(ctx context.Context, in models.ScanInput) (*
 		for _, endpoint := range gatewayHTTPURLs(ip) {
 			fp, err := f.fetch(ctx, endpoint)
 			if err != nil {
+				dev.FailedAttempts = append(dev.FailedAttempts, failedHTTPAttempt(p.Name(), ip, endpoint, http.MethodGet, err))
 				continue
 			}
 			dev.Reachable = true
+			dev.ReachableState = models.ReachableTrue
+			if port := endpointPort(endpoint); port != 0 {
+				dev.OpenPorts = appendUniqueInts(dev.OpenPorts, port)
+			}
+			dev.HTTPObservations = append(dev.HTTPObservations, httpObservationFromFingerprint(p.Name(), endpoint, http.MethodGet, fp))
 			if dev.HTTPTitle == "" {
 				dev.HTTPTitle = fp.Title
 			}
@@ -100,10 +107,17 @@ func (p HTTPFingerprintV2Probe) Run(ctx context.Context, in models.ScanInput) (*
 			break
 		}
 		if dev.TLSCertCN == "" {
-			cn, sans := f.tlsInfo(ctx, ip)
+			cn, sans, issuer := f.tlsInfo(ctx, ip)
 			dev.TLSCertCN = cn
 			dev.TLSCertSANs = sans
+			dev.TLSCertIssuer = issuer
 			dev.TLSServerName = cn
+			if cn != "" || len(sans) > 0 || issuer != "" {
+				dev.TLSObservations = append(dev.TLSObservations, models.TLSObservation{
+					Source: p.Name(), IP: ip, Port: 443, CN: cn, SANs: sans, Issuer: issuer, ServerName: cn,
+					EvidenceID: p.Name() + ":" + ip + ":tls:443",
+				})
+			}
 			textParts = append(textParts, cn, strings.Join(sans, " "))
 		}
 		allText := strings.Join(textParts, " ")
@@ -112,12 +126,18 @@ func (p HTTPFingerprintV2Probe) Run(ctx context.Context, in models.ScanInput) (*
 		if dev.Model == "" {
 			dev.Model = inferModel(dev.WWWAuthRealm)
 		}
+		dev.CPEModelGuess = strings.TrimSpace(strings.Join([]string{dev.Manufacturer, dev.Model}, " "))
 		accessText := strings.Join([]string{dev.Manufacturer, dev.Model, allText}, " ")
 		dev.AccessHints = inferAccessHints(accessText)
 		dev.DeviceConfidence = gatewayDeviceConfidence(dev)
 		dev.AccessConfidence = gatewayDeviceAccessConfidence(dev, accessText)
 		dev.Confidence = dev.DeviceConfidence
+		dev.EvidenceIDs = appendUniqueStrings(dev.EvidenceIDs, p.Name()+":"+ip)
 		if dev.AccessConfidence > 0 {
+			dev.AccessEvidence = append(dev.AccessEvidence, models.GatewayAccessEvidence{
+				Source: p.Name(), Type: "device_text", Value: accessText, Strength: "medium",
+				Confidence: dev.AccessConfidence, Hints: dev.AccessHints, EvidenceID: p.Name() + ":" + ip + ":access",
+			})
 			for _, h := range dev.AccessHints {
 				hints = appendUnique(hints, h)
 			}
@@ -168,7 +188,7 @@ func (p HTTPFingerprintV2Probe) candidates(ctx context.Context, in models.ScanIn
 
 func fetchHTTPFingerprintV2(ctx context.Context, endpoint string) (httpFingerprintV2Result, error) {
 	client := &http.Client{
-		Timeout: 2 * time.Second,
+		Timeout:   2 * time.Second,
 		Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
@@ -192,6 +212,7 @@ func fetchHTTPFingerprintV2(ctx context.Context, endpoint string) (httpFingerpri
 	redirectLocation := resp.Header.Get("Location")
 	return httpFingerprintV2Result{
 		Title:             extractTitle(text),
+		StatusCode:        resp.StatusCode,
 		Server:            resp.Header.Get("Server"),
 		WWWAuthenticate:   authHeader,
 		WWWAuthRealm:      parseAuthRealm(authHeader),
@@ -204,26 +225,26 @@ func fetchHTTPFingerprintV2(ctx context.Context, endpoint string) (httpFingerpri
 	}, nil
 }
 
-func fetchTLSInfo(ctx context.Context, ip string) (string, []string) {
+func fetchTLSInfo(ctx context.Context, ip string) (string, []string, string) {
 	dialer := &tls.Dialer{
 		NetDialer: &net.Dialer{Timeout: 1200 * time.Millisecond},
 		Config:    &tls.Config{InsecureSkipVerify: true, ServerName: ip},
 	}
 	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(ip, "443"))
 	if err != nil {
-		return "", nil
+		return "", nil, ""
 	}
 	defer conn.Close()
 	tlsConn, ok := conn.(*tls.Conn)
 	if !ok {
-		return "", nil
+		return "", nil, ""
 	}
 	state := tlsConn.ConnectionState()
 	if len(state.PeerCertificates) == 0 {
-		return "", nil
+		return "", nil, ""
 	}
 	cert := state.PeerCertificates[0]
-	return cert.Subject.CommonName, append([]string{}, cert.DNSNames...)
+	return cert.Subject.CommonName, append([]string{}, cert.DNSNames...), cert.Issuer.String()
 }
 
 func parseAuthRealm(header string) string {
@@ -292,6 +313,75 @@ func maxDeviceAccessConfidence(devices []models.GatewayDevice) float64 {
 func appendUniqueStrings(s []string, values ...string) []string {
 	for _, v := range values {
 		if v == "" {
+			continue
+		}
+		found := false
+		for _, e := range s {
+			if e == v {
+				found = true
+				break
+			}
+		}
+		if !found {
+			s = append(s, v)
+		}
+	}
+	return s
+}
+
+func httpObservationFromFingerprint(source, endpoint, method string, fp httpFingerprintV2Result) models.HTTPObservation {
+	return models.HTTPObservation{
+		Source: source, URL: endpoint, Method: method, StatusCode: fp.StatusCode,
+		Title: fp.Title, ServerHeader: fp.Server, WWWAuthenticate: fp.WWWAuthenticate,
+		WWWAuthRealm: fp.WWWAuthRealm, RedirectPath: fp.RedirectPath, RedirectLocation: fp.RedirectLocation,
+		FaviconHash: fp.FaviconHash, HTMLMetaGenerator: fp.HTMLMetaGenerator, LoginLabels: fp.LoginLabels,
+		EvidenceID: source + ":" + endpoint,
+	}
+}
+
+func failedHTTPAttempt(source, ip, endpoint, method string, err error) models.ProbeAttempt {
+	msg := ""
+	if err != nil {
+		msg = err.Error()
+	}
+	return models.ProbeAttempt{
+		Source: source, Target: ip, Protocol: "http", URL: endpoint, Method: method,
+		Error: msg, Timeout: strings.Contains(strings.ToLower(msg), "timeout"),
+		EvidenceID: source + ":" + endpoint + ":failed",
+	}
+}
+
+func endpointPort(endpoint string) int {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return 0
+	}
+	if port := u.Port(); port != "" {
+		switch port {
+		case "80":
+			return 80
+		case "443":
+			return 443
+		case "8080":
+			return 8080
+		case "8443":
+			return 8443
+		case "7547":
+			return 7547
+		}
+	}
+	if u.Scheme == "https" {
+		return 443
+	}
+	if u.Scheme == "http" {
+		return 80
+	}
+	return 0
+}
+
+func appendUniqueInts(s []int, values ...int) []int {
+	for _, v := range values {
+		if v == 0 {
 			continue
 		}
 		found := false

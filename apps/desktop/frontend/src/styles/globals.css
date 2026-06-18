@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  background: #09090b;
+}
+
+:root.light {
+  color-scheme: light;
+  background: #f6f7fb;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.app-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+}
+
+.app-scroll::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+.app-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+}
+
+.react-flow {
+  --xy-background-color: transparent;
+  --xy-edge-stroke-default: #9ca3af;
+  --xy-edge-stroke-width-default: 1.6;
+  --xy-node-boxshadow-default: none;
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+}
+
+.react-flow__attribution {
+  display: none;
+}
+
+.react-flow__controls {
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.react-flow__controls-button {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 17, 21, 0.92);
+  color: #d4d4d8;
+}
+
+.light .react-flow__controls-button {
+  background: rgba(255, 255, 255, 0.94);
+  color: #18181b;
+}

@@ -1,0 +1,135 @@
+[
+  {
+    "probe_name": "adapter_probe",
+    "status": "success",
+    "confidence": 0.4,
+    "evidence": {
+      "adapters": [
+        {
+          "name": "Ethernet",
+          "up": true,
+          "addrs": ["192.168.31.147/24"]
+        }
+      ]
+    }
+  },
+  {
+    "probe_name": "gateway_probe",
+    "status": "success",
+    "confidence": 0.4,
+    "evidence": {
+      "gateway": "192.168.31.1"
+    }
+  },
+  {
+    "probe_name": "traceroute_probe",
+    "status": "success",
+    "confidence": 0.25,
+    "evidence": {
+      "hops": ["192.168.31.1", "192.168.1.1", "95.15.180.1", "81.212.73.143"]
+    }
+  },
+  {
+    "probe_name": "http_fingerprint_v2",
+    "status": "success",
+    "confidence": 0.5,
+    "evidence": {
+      "gateway_devices": [
+        {
+          "ip": "192.168.31.1",
+          "role": "default_gateway",
+          "reachable": true,
+          "reachable_state": "true",
+          "open_ports": [80, 443, 8443],
+          "server_header": "nginx",
+          "favicon_hash": "252c9ce330c5f06d",
+          "device_confidence": 0.5,
+          "access_confidence": 0,
+          "confidence": 0.5
+        },
+        {
+          "ip": "192.168.1.1",
+          "role": "upstream_private_gateway",
+          "reachable_state": "unknown",
+          "failed_attempts": [
+            {
+              "source": "http_fingerprint_v2",
+              "target": "192.168.1.1",
+              "protocol": "http",
+              "url": "http://192.168.1.1/",
+              "method": "GET",
+              "error": "context deadline exceeded",
+              "timeout": true
+            }
+          ]
+        }
+      ],
+      "device_confidence": 0.5,
+      "access_confidence": 0,
+      "strong_access_evidence": false
+    }
+  },
+  {
+    "probe_name": "http_fingerprint_v3",
+    "status": "success",
+    "confidence": 0,
+    "evidence": {
+      "gateway_devices": [
+        {
+          "ip": "192.168.31.1",
+          "role": "default_gateway",
+          "reachable_state": "unknown",
+          "failed_attempts": [
+            {
+              "source": "http_fingerprint_v3",
+              "target": "192.168.31.1",
+              "protocol": "http",
+              "url": "http://192.168.31.1/",
+              "method": "GET",
+              "error": "context deadline exceeded",
+              "timeout": true
+            }
+          ]
+        }
+      ],
+      "device_confidence": 0,
+      "access_confidence": 0,
+      "strong_access_evidence": false
+    }
+  },
+  {
+    "probe_name": "stun_pcp_nat_probe",
+    "status": "success",
+    "confidence": 0.35,
+    "evidence": {
+      "network_confidence": 0.35,
+      "nat_topology": {
+        "public_ip": "95.15.182.146",
+        "stun_public_ip": "95.15.182.146",
+        "public_ip_matches": true,
+        "external_public_ip_consistent": true,
+        "double_nat": false,
+        "internal_double_nat_possible": false
+      }
+    }
+  },
+  {
+    "probe_name": "asn_probe",
+    "status": "success",
+    "confidence": 0.2,
+    "hints": ["Fiber", "VDSL"],
+    "evidence": {
+      "ptr": "95.15.182.146.static.ttnet.com.tr",
+      "org": "TurkTelekom"
+    }
+  },
+  {
+    "probe_name": "latency_probe",
+    "status": "success",
+    "confidence": 0.1,
+    "evidence": {
+      "avg_ms": 3,
+      "jitter_ms": 0.3
+    }
+  }
+]
