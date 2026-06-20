@@ -1,39 +1,76 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
-  Controls,
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
+  useEdgesState,
+  useNodesState,
   useReactFlow,
   type Edge,
   type EdgeMouseHandler,
   type EdgeTypes,
   type Node,
+  type NodeChange,
   type NodeMouseHandler,
   type NodeTypes,
   type OnNodeDrag,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useScanStore } from '../../store/useScanStore';
+import { useScanStore, isActiveScanStatus } from '../../store/useScanStore';
 import { useUIStore } from '../../store/useUIStore';
+import { useReducedMotion } from '../../lib/useReducedMotion';
 import { layoutWithElk } from '../../lib/layout-elk';
-import type { LayoutPosition, NormalizedScanReport, TopologyEdge, TopologyNode } from '../../lib/models';
+import type { LayoutPosition, NormalizedScanReport, TopologyEdge, TopologyNode, TopologyViewModel } from '../../lib/models';
+import { applyTopologyFilters, defaultTopologyFilters, topologyFilterOptions, type TopologyFilterState } from '../../lib/topology-filters';
 import { formatTopologyEdgeLabel, nodeDisplayTitle } from '../../lib/topology-display';
 import { Icons } from '../icons/Icon';
 import { TopologyNodeView } from './TopologyNodeView';
 import { TopologyEdgeView } from './TopologyEdgeView';
+import { TopologyStatusBar } from './TopologyStatusBar';
+import { PacketAnimationContext, type PacketAnimationConfig } from './packet-animation-context';
+import type { PacketIntensity } from '../../lib/packet-flow';
 
-const nodeTypes: NodeTypes = { iadNode: TopologyNodeView };
+const topologyNodeTypeKeys = [
+  'iadNode',
+  'gateway',
+  'router',
+  'managed_switch',
+  'switch',
+  'access_point',
+  'mesh_node',
+  'repeater',
+  'wireless_client',
+  'wired_client',
+  'server',
+  'printer',
+  'phone',
+  'mobile',
+  'iot',
+  'unknown',
+  'host',
+  'workstation',
+  'local_host',
+];
+const nodeTypes: NodeTypes = Object.fromEntries(topologyNodeTypeKeys.map((key) => [key, TopologyNodeView]));
 const edgeTypes: EdgeTypes = { iadEdge: TopologyEdgeView };
 type InteractionMode = 'move' | 'pan';
+
+function topologyStructureKey(topology: TopologyViewModel | null): string {
+  if (!topology) return '';
+  const nodes = topology.nodes.map((node) => node.id).sort().join('|');
+  const edges = topology.edges.map((edge) => `${edge.id}:${edge.source}>${edge.target}`).sort().join('|');
+  return `${nodes}::${edges}`;
+}
 
 function TopologyCanvas() {
   const { fitView, zoomIn, zoomOut } = useReactFlow();
   const normalized = useScanStore((state) => state.normalized);
   const topology = normalized?.topology;
-  const isScanning = useScanStore((state) => state.isScanning);
+  const scanStatus = useScanStore((state) => state.scanStatus);
   const scanError = useScanStore((state) => state.scanError);
+  const setScanError = useScanStore((state) => state.setScanError);
+  const scanActive = isActiveScanStatus(scanStatus);
   const settings = useUIStore((state) => state.settings);
   const layoutPositions = useUIStore((state) => state.layoutPositions);
   const setNodePosition = useUIStore((state) => state.setNodePosition);
@@ -42,43 +79,117 @@ function TopologyCanvas() {
   const selectEdge = useUIStore((state) => state.selectEdge);
   const selectedNodeId = useUIStore((state) => state.selectedNodeId);
   const selectedEdgeId = useUIStore((state) => state.selectedEdgeId);
+  const setPacketAnimation = useUIStore((state) => state.setPacketAnimation);
+  const setPacketIntensity = useUIStore((state) => state.setPacketIntensity);
+  const reducedMotion = useReducedMotion();
   const [autoPositions, setAutoPositions] = useState<Record<string, LayoutPosition>>({});
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('move');
-  const [showLineLabels, setShowLineLabels] = useState(true);
+  const [showLineLabels, setShowLineLabels] = useState(false);
   const [showMiniMap, setShowMiniMap] = useState(true);
+  const [filters, setFilters] = useState<TopologyFilterState>(defaultTopologyFilters);
+
+  const filteredTopology = useMemo(() => {
+    return applyTopologyFilters(topology, filters);
+  }, [filters, topology]);
+  const filteredTopologyRef = useRef<TopologyViewModel | null>(null);
+  const structureKey = useMemo(() => topologyStructureKey(filteredTopology), [filteredTopology]);
 
   useEffect(() => {
-    if (!topology) return;
+    filteredTopologyRef.current = filteredTopology;
+  }, [filteredTopology]);
+
+  const filterOptions = useMemo(() => {
+    return topologyFilterOptions(topology);
+  }, [topology]);
+
+  // Auto-layout runs ELK but only ASSIGNS positions to nodes that don't already
+  // have one. Existing nodes keep their computed/manual position, so live
+  // updates add new devices without shuffling the whole map (requirements 19–21).
+  useEffect(() => {
+    const currentTopology = filteredTopologyRef.current;
+    if (!currentTopology) return;
     let cancelled = false;
-    layoutWithElk(topology, settings.layoutEngine).then((positions) => {
-      if (!cancelled) setAutoPositions(positions);
+    layoutWithElk(currentTopology, settings.layoutEngine).then((positions) => {
+      if (cancelled) return;
+      setAutoPositions((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const [id, pos] of Object.entries(positions)) {
+          if (next[id] == null) {
+            next[id] = pos;
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
     });
     return () => {
       cancelled = true;
     };
-  }, [settings.layoutEngine, topology]);
+  }, [settings.layoutEngine, structureKey]);
 
+  // Explicit "Auto Layout": recompute the full ELK layout, clear manual drags,
+  // and fit once. This is the only path that intentionally moves existing nodes.
+  const runAutoLayout = useCallback(() => {
+    if (!filteredTopology) return;
+    layoutWithElk(filteredTopology, settings.layoutEngine).then((positions) => {
+      setAutoPositions(positions);
+      resetLayoutPositions();
+      window.setTimeout(() => void fitView({ padding: 0.2, duration: 240 }), 40);
+    });
+  }, [filteredTopology, settings.layoutEngine, fitView, resetLayoutPositions]);
+
+  // Fit the view only on the first populated render and whenever NEW nodes
+  // appear (count grows) — never on data-only updates, so zoom/pan stay put
+  // during live scanning (requirements 23–25).
+  const fittedRef = useRef(false);
+  const prevNodeCountRef = useRef(0);
+  const visibleNodeCount = filteredTopology?.nodes.length ?? 0;
   useEffect(() => {
-    if (!topology || topology.nodes.length === 0 || Object.keys(autoPositions).length === 0) return;
-    const timer = window.setTimeout(() => void fitView({ padding: 0.24, duration: 180 }), 40);
+    const count = visibleNodeCount;
+    if (count === 0 || Object.keys(autoPositions).length === 0) return;
+    const grew = count > prevNodeCountRef.current;
+    prevNodeCountRef.current = count;
+    if (fittedRef.current && !grew) return;
+    fittedRef.current = true;
+    const timer = window.setTimeout(() => void fitView({ padding: 0.24, duration: 200 }), 50);
     return () => window.clearTimeout(timer);
-  }, [autoPositions, fitView, topology]);
+  }, [autoPositions, fitView, visibleNodeCount]);
 
-  const nodes: Node<TopologyNode>[] = useMemo(() => {
-    if (!topology) return [];
-    return topology.nodes.map((node: TopologyNode) => ({
+  // Nodes derived from the report + persisted/auto layout. React Flow needs to
+  // own the live node array during interaction (so drags apply frame-by-frame
+  // instead of teleporting on release), so we feed this into useNodesState and
+  // re-sync whenever the underlying data changes.
+  const desiredNodes: Node<TopologyNode>[] = useMemo(() => {
+    if (!filteredTopology) return [];
+    return filteredTopology.nodes.map((node: TopologyNode) => ({
       id: node.id,
-      type: 'iadNode',
+      type: nodeTypes[String(node.type)] ? String(node.type) : 'unknown',
       data: node,
       position: layoutPositions[node.id] ?? autoPositions[node.id] ?? node.position,
       selected: selectedNodeId === node.id,
       draggable: interactionMode === 'move',
     }));
-  }, [autoPositions, interactionMode, layoutPositions, selectedNodeId, topology]);
+  }, [autoPositions, interactionMode, layoutPositions, selectedNodeId, filteredTopology]);
 
-  const edges: Edge<TopologyEdge>[] = useMemo(() => {
-    if (!topology) return [];
-    return topology.edges.map((edge: TopologyEdge) => ({
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<TopologyNode>>([]);
+
+  const handleNodesChange = useCallback((changes: NodeChange<Node<TopologyNode>>[]) => {
+    onNodesChange(changes);
+    changes.forEach((change) => {
+      if (change.type === 'position' && change.position) {
+        setNodePosition(change.id, change.position);
+      }
+    });
+  }, [onNodesChange, setNodePosition]);
+
+  useEffect(() => {
+    setNodes(desiredNodes);
+  }, [desiredNodes, setNodes]);
+
+  const desiredEdges: Edge<TopologyEdge>[] = useMemo(() => {
+    if (!filteredTopology) return [];
+    return filteredTopology.edges.map((edge: TopologyEdge) => ({
       id: edge.id,
       source: edge.source,
       target: edge.target,
@@ -86,40 +197,50 @@ function TopologyCanvas() {
       data: { ...edge, showLabel: showLineLabels },
       selected: selectedEdgeId === edge.id,
     }));
-  }, [selectedEdgeId, showLineLabels, topology]);
+  }, [selectedEdgeId, showLineLabels, filteredTopology]);
+
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge<TopologyEdge>>([]);
+
+  useEffect(() => {
+    setEdges(desiredEdges);
+  }, [desiredEdges, setEdges]);
 
   const nodeLabels = useMemo(() => {
     const labels = new Map<string, string>();
-    topology?.nodes.forEach((node) => labels.set(node.id, nodeDisplayTitle(node)));
+    filteredTopology?.nodes.forEach((node) => labels.set(node.id, nodeDisplayTitle(node)));
     return labels;
-  }, [topology]);
+  }, [filteredTopology]);
+
+  const mapDeviceCount = filteredTopology?.nodes.filter((node) => Boolean(node.deviceId)).length ?? 0;
+  const linkCount = filteredTopology?.edges.length ?? 0;
+  const isEmpty = !filteredTopology || filteredTopology.nodes.length === 0;
+
+  // Packet animation config, shared with every edge via context. Particle count
+  // is capped automatically on dense graphs (performance mode) so the SVG cost
+  // stays bounded regardless of how many edges are active.
+  const packetConfig = useMemo<PacketAnimationConfig>(() => {
+    const maxParticles = linkCount > 120 ? 1 : linkCount > 60 ? 2 : 3;
+    // Honor the OS reduced-motion preference (SMIL ignores the CSS media query).
+    return { enabled: settings.packetAnimation && !reducedMotion, intensity: settings.packetIntensity, maxParticles };
+  }, [settings.packetAnimation, settings.packetIntensity, linkCount, reducedMotion]);
 
   const onNodeClick: NodeMouseHandler = (_, node) => selectNode(node.id);
   const onEdgeClick: EdgeMouseHandler = (_, edge) => selectEdge(edge.id);
+  const onNodeDrag: OnNodeDrag = (_, node) => setNodePosition(node.id, node.position);
   const onNodeDragStop: OnNodeDrag = (_, node) => setNodePosition(node.id, node.position);
 
-  if (!topology || topology.nodes.length === 0) {
-    return (
-      <div className="flex h-full items-center justify-center p-8 text-center text-sm text-zinc-500">
-        {isScanning ? (
-          <span className="inline-flex items-center gap-3">
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
-            Scanning the network… this can take up to a minute.
-          </span>
-        ) : scanError ? (
-          <div className="max-w-lg rounded-md border border-red-500/40 bg-red-500/10 p-4 text-left">
-            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-red-500">Scan failed</div>
-            <div className="font-mono text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-300">{scanError}</div>
-          </div>
-        ) : (
-          <span>No scan loaded. Click <b>Run Scan</b> to map your network, or import a report.</span>
-        )}
-      </div>
-    );
-  }
-
+  // NOTE: the canvas is ALWAYS rendered now — even with zero nodes — so the UI
+  // never blocks on a "Scanning…" screen. Empty/scan/error states are drawn as
+  // non-blocking overlays on top of the live map (requirements 1–7, 14–15).
   return (
+    <PacketAnimationContext.Provider value={packetConfig}>
     <div className="flex h-full min-h-0 flex-col">
+      <TopologyStatusBar
+        deviceCount={mapDeviceCount}
+        linkCount={linkCount}
+        onFit={() => void fitView({ padding: 0.2, duration: 240 })}
+        onAutoLayout={runAutoLayout}
+      />
       {normalized && <TopologyBanner normalized={normalized} />}
       <div className="flex h-11 items-center gap-4 border-b border-zinc-800 bg-zinc-950/80 px-4 text-xs text-zinc-400">
         <span className="font-mono uppercase tracking-[0.2em] text-zinc-500">Topology map</span>
@@ -129,11 +250,58 @@ function TopologyCanvas() {
         </div>
         <span className="ml-auto font-mono text-zinc-500">
           {normalized?.discoverySummary
-            ? `${normalized.discoverySummary.devicesFound} devices discovered / ${normalized.discoverySummary.addressesScanned} addresses scanned`
-            : `${topology.nodes.length} nodes / ${topology.edges.length} edges`}
+            ? `${mapDeviceCount} devices on map / ${normalized.discoverySummary.devicesFound} LAN discovered / ${normalized.discoverySummary.addressesScanned} addresses scanned`
+            : `${filteredTopology?.nodes.length ?? 0} nodes / ${filteredTopology?.edges.length ?? 0} edges`}
         </span>
       </div>
+      <TopologyFilters filters={filters} onChange={setFilters} options={filterOptions} />
       <div className="relative min-h-0 flex-1 bg-[radial-gradient(circle_at_1px_1px,rgba(148,163,184,.16)_1px,transparent_0)] [background-size:22px_22px]">
+        {/* Empty-state overlay — never blocks the canvas; pointer-events off so
+            zoom/pan still work underneath. */}
+        {isEmpty && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-8 text-center">
+            <div className="max-w-sm">
+              {scanActive ? (
+                <>
+                  <span className="mx-auto mb-3 block h-6 w-6 animate-spin rounded-full border-2 border-zinc-500 border-t-transparent" />
+                  <div className="text-sm font-semibold text-zinc-300">Waiting for devices…</div>
+                  <div className="mt-1 text-[12px] text-zinc-500">
+                    The map will fill in automatically as the scan discovers hosts.
+                  </div>
+                </>
+              ) : scanError ? (
+                <div className="text-sm text-zinc-400">
+                  No devices on the map yet. See the error above, then try a rescan.
+                </div>
+              ) : (
+                <div className="text-sm text-zinc-400">
+                  No scan loaded. Click <b className="text-zinc-200">Rescan</b> to map your network, or import a report.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Non-blocking failure banner — the last good topology stays on screen
+            (requirement 14). Dismissible. */}
+        {scanError && (
+          <div className="absolute right-4 top-4 z-30 max-w-md rounded-md border border-red-500/40 bg-red-950/90 px-3 py-2 shadow-lg shadow-black/40 backdrop-blur">
+            <div className="flex items-start gap-2">
+              <div className="min-w-0">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-red-400">Scan error</div>
+                <div className="mt-0.5 break-words font-mono text-[11px] leading-relaxed text-red-200/90">{scanError}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setScanError(null)}
+                aria-label="Dismiss error"
+                className="ml-auto shrink-0 rounded px-1 text-red-300 hover:bg-red-500/20"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
         <MapToolbar
           interactionMode={interactionMode}
           onInteractionModeChange={setInteractionMode}
@@ -148,6 +316,10 @@ function TopologyCanvas() {
             resetLayoutPositions();
             window.setTimeout(() => void fitView({ padding: 0.18, duration: 260 }), 0);
           }}
+          packetAnimation={settings.packetAnimation}
+          packetIntensity={settings.packetIntensity}
+          onTogglePackets={() => setPacketAnimation(!settings.packetAnimation)}
+          onCyclePackets={() => setPacketIntensity(nextIntensity(settings.packetIntensity))}
         />
         <div className="pointer-events-none absolute bottom-4 left-4 z-10 rounded-md border border-zinc-800 bg-zinc-950/90 px-3 py-2 text-[11px] text-zinc-400 shadow-sm shadow-black/30 backdrop-blur">
           <span className="font-mono uppercase tracking-[0.12em] text-zinc-500">
@@ -164,8 +336,11 @@ function TopologyCanvas() {
           edges={edges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={onEdgesChange}
           onNodeClick={onNodeClick}
           onEdgeClick={onEdgeClick}
+          onNodeDrag={onNodeDrag}
           onNodeDragStop={onNodeDragStop}
           fitView
           fitViewOptions={{ padding: 0.24 }}
@@ -180,7 +355,6 @@ function TopologyCanvas() {
           proOptions={{ hideAttribution: true }}
         >
           <Background color="rgba(148,163,184,.18)" gap={28} size={1} />
-          <Controls showInteractive={false} position="bottom-right" />
           {showMiniMap ? (
             <MiniMap
               pannable
@@ -198,14 +372,15 @@ function TopologyCanvas() {
           ) : null}
         </ReactFlow>
       </div>
-      {topology.edges.length > 0 ? (
+      {filteredTopology && filteredTopology.edges.length > 0 ? (
         <div className="shrink-0 overflow-x-auto border-t border-zinc-800 bg-zinc-950 px-4 py-2 font-mono text-[11px] text-zinc-500">
           <div className="whitespace-nowrap">
-            {topology.edges.map((edge: TopologyEdge) => `${nodeLabels.get(edge.source) ?? edge.source} -> ${nodeLabels.get(edge.target) ?? edge.target}: ${formatTopologyEdgeLabel(edge)}`).join('  |  ')}
+            {filteredTopology.edges.map((edge: TopologyEdge) => `${nodeLabels.get(edge.source) ?? edge.source} -> ${nodeLabels.get(edge.target) ?? edge.target}: ${formatTopologyEdgeLabel(edge)}`).join('  |  ')}
           </div>
         </div>
       ) : null}
     </div>
+    </PacketAnimationContext.Provider>
   );
 }
 
@@ -220,6 +395,10 @@ function MapToolbar({
   onZoomIn,
   onZoomOut,
   onResetLayout,
+  packetAnimation,
+  packetIntensity,
+  onTogglePackets,
+  onCyclePackets,
 }: {
   interactionMode: InteractionMode;
   onInteractionModeChange: (mode: InteractionMode) => void;
@@ -231,6 +410,10 @@ function MapToolbar({
   onZoomIn: () => void;
   onZoomOut: () => void;
   onResetLayout: () => void;
+  packetAnimation: boolean;
+  packetIntensity: PacketIntensity;
+  onTogglePackets: () => void;
+  onCyclePackets: () => void;
 }) {
   return (
     <div className="absolute left-4 top-4 z-20 flex max-w-[calc(100%-2rem)] flex-wrap items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-950/94 p-1.5 shadow-lg shadow-black/35 backdrop-blur">
@@ -266,8 +449,32 @@ function MapToolbar({
       <ToolbarButton active={showMiniMap} label="Mini map" onClick={() => onShowMiniMapChange(!showMiniMap)}>
         <Icons.topology size={14} />
       </ToolbarButton>
+
+      <div className="h-6 w-px bg-zinc-800" />
+
+      {/* Packet flow animation: on/off + Low/Normal/High intensity. */}
+      <ToolbarButton
+        active={packetAnimation}
+        label={packetAnimation ? 'Packet animation: on' : 'Packet animation: off'}
+        onClick={onTogglePackets}
+      >
+        <span className={`inline-block h-2 w-2 rounded-full ${packetAnimation ? 'bg-cyan-400 shadow-[0_0_6px_1px] shadow-cyan-400/70' : 'bg-zinc-600'}`} />
+        <span className="ml-1 hidden sm:inline">Packets</span>
+      </ToolbarButton>
+      <ToolbarButton
+        disabled={!packetAnimation}
+        label={`Animation intensity: ${packetIntensity}`}
+        onClick={onCyclePackets}
+      >
+        <span className="font-mono uppercase">{packetIntensity === 'low' ? 'L' : packetIntensity === 'high' ? 'H' : 'N'}</span>
+      </ToolbarButton>
     </div>
   );
+}
+
+/** Cycle packet animation intensity: low → normal → high → low. */
+function nextIntensity(current: PacketIntensity): PacketIntensity {
+  return current === 'low' ? 'normal' : current === 'normal' ? 'high' : 'low';
 }
 
 function ToolbarButton({
@@ -299,8 +506,102 @@ function ToolbarButton({
       ].join(' ')}
     >
       {children}
-      <span className="hidden sm:inline">{label}</span>
+      <span className="sr-only">{label}</span>
     </button>
+  );
+}
+
+function TopologyFilters({
+  filters,
+  onChange,
+  options,
+}: {
+  filters: TopologyFilterState;
+  onChange: (filters: TopologyFilterState) => void;
+  options: { types: string[]; evidence: string[] };
+}) {
+  const update = <K extends keyof TopologyFilterState>(key: K, value: TopologyFilterState[K]) => onChange({ ...filters, [key]: value });
+  const mobileOptions = [
+    ['all', 'All OS'],
+    ['ios', 'iPhone / iOS'],
+    ['ipados', 'iPad / iPadOS'],
+    ['android', 'Android'],
+    ['unknown_mobile', 'Unknown mobile'],
+    ['unknown_device', 'Unknown device'],
+    ['conflict', 'Conflict'],
+  ] as const;
+  return (
+    <div className="flex min-h-10 flex-wrap items-center gap-2 border-b border-zinc-800 bg-zinc-950/88 px-4 py-2 text-[11px] text-zinc-400">
+      <span className="font-mono uppercase tracking-[0.16em] text-zinc-500">Filters</span>
+      <select className="h-7 rounded border border-zinc-800 bg-zinc-900 px-2 text-zinc-300" value={filters.deviceType} onChange={(event) => update('deviceType', event.target.value)}>
+        <option value="all">All types</option>
+        {options.types.map((type) => <option key={type} value={type}>{type.replace(/_/g, ' ')}</option>)}
+      </select>
+      <select className="h-7 rounded border border-zinc-800 bg-zinc-900 px-2 text-zinc-300" value={filters.online} onChange={(event) => update('online', event.target.value)}>
+        <option value="all">Any status</option>
+        <option value="online">Online</option>
+        <option value="offline">Offline/seen</option>
+      </select>
+      <select className="h-7 rounded border border-zinc-800 bg-zinc-900 px-2 text-zinc-300" value={filters.evidenceSource} onChange={(event) => update('evidenceSource', event.target.value)}>
+        <option value="all">Any evidence</option>
+        {options.evidence.map((source) => <option key={source} value={source}>{source}</option>)}
+      </select>
+      <div className="flex max-w-full flex-wrap items-center gap-1">
+        {mobileOptions.map(([value, label]) => {
+          const active = filters.mobileOS === value;
+          const conflict = value === 'conflict';
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => update('mobileOS', value)}
+              className={[
+                'h-7 rounded border px-2 font-mono text-[10px] uppercase tracking-wide transition-colors',
+                active
+                  ? conflict
+                    ? 'border-amber-400 bg-amber-500/15 text-amber-200'
+                    : 'border-sky-400 bg-sky-500/15 text-sky-200'
+                  : 'border-zinc-800 bg-zinc-900 text-zinc-500 hover:border-zinc-600 hover:text-zinc-200',
+              ].join(' ')}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      <label className="inline-flex items-center gap-2">
+        <span className="font-mono text-[10px] uppercase tracking-wide text-zinc-500">Confidence</span>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={Math.round(filters.minConfidence * 100)}
+          onChange={(event) => update('minConfidence', Number(event.target.value) / 100)}
+          className="w-24"
+        />
+        <span className="w-8 text-right font-mono">{Math.round(filters.minConfidence * 100)}%</span>
+      </label>
+      <input
+        className="h-7 w-32 rounded border border-zinc-800 bg-zinc-900 px-2 font-mono text-zinc-300 placeholder:text-zinc-600"
+        placeholder="SSID/BSSID"
+        value={filters.wireless}
+        onChange={(event) => update('wireless', event.target.value)}
+      />
+      <input
+        className="h-7 w-28 rounded border border-zinc-800 bg-zinc-900 px-2 font-mono text-zinc-300 placeholder:text-zinc-600"
+        placeholder="Subnet prefix"
+        value={filters.subnet}
+        onChange={(event) => update('subnet', event.target.value)}
+      />
+      <button
+        type="button"
+        className="ml-auto h-7 rounded border border-zinc-800 px-2 font-mono text-[10px] uppercase tracking-wide text-zinc-400 hover:border-blue-400 hover:text-blue-300"
+        onClick={() => onChange(defaultTopologyFilters)}
+      >
+        Reset filters
+      </button>
+    </div>
   );
 }
 

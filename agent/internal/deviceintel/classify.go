@@ -5,23 +5,42 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/thekiran/iad/internal/discovery"
 	"github.com/thekiran/iad/pkg/models"
 )
 
 func classifyAll(store *EvidenceStore) {
+	classifyAllWithEvidence(store, nil)
+}
+
+func classifyAllWithEvidence(store *EvidenceStore, evidence []models.Evidence) {
 	for _, d := range store.Devices {
-		classifyDevice(d)
+		classifyDevice(d, evidence)
 	}
 }
 
-func classifyDevice(d *models.DeviceIntelDevice) {
+func classifyDevice(d *models.DeviceIntelDevice, evidence []models.Evidence) {
 	addServiceRoles(d)
 	addProtocolInfo(d)
+	applyMobileFingerprint(d, evidence)
 	addDeviceTypeCandidates(d)
 	pickPrimaryType(d)
 	guessOS(d)
 	addSecurityFindings(d)
 	finalizeConfidence(d)
+}
+
+func applyMobileFingerprint(d *models.DeviceIntelDevice, evidence []models.Evidence) {
+	engine := discovery.NewMobileDeviceFingerprintEngine(nil)
+	fp := engine.FingerprintDeviceIntel(*d, evidence)
+	d.MobileFingerprint = &fp
+	d.OSHint = discovery.MobileOSHint(fp.Classification)
+	d.OSConfidence = fp.Confidence
+	d.DeviceTypeHint = discovery.MobileDeviceTypeHint(fp, d.Hostnames)
+	if d.OSHint != models.MobileOSHintUnknown {
+		d.ClassificationExplanation = appendUnique(d.ClassificationExplanation, fp.WhyThisClassification)
+		d.UndeterminedWithoutOptIn = appendUnique(d.UndeterminedWithoutOptIn, fp.WhyNotCertain)
+	}
 }
 
 func addServiceRoles(d *models.DeviceIntelDevice) {
@@ -200,6 +219,24 @@ func addDeviceTypeCandidates(d *models.DeviceIntelDevice) {
 		})
 	}
 
+	if d.MobileFingerprint != nil && d.OSHint != models.MobileOSHintUnknown {
+		typ := models.DeviceTypeAndroidDevice
+		if d.OSHint == models.MobileOSHintIOS || d.OSHint == models.MobileOSHintIPadOS {
+			typ = models.DeviceTypeAppleDevice
+		}
+		conf := d.MobileFingerprint.Confidence
+		if conf < 0.45 {
+			conf = 0.45
+		}
+		add(models.DeviceTypeCandidate{
+			Type:            typ,
+			Confidence:      conf,
+			SupportingFacts: []string{d.MobileFingerprint.WhyThisClassification},
+			MissingEvidence: []string{d.MobileFingerprint.WhyNotCertain},
+			EvidenceIDs:     d.EvidenceIDs,
+		})
+	}
+
 	if hasOpenPort(d, 22) && hasAnyPort(d, 80, 443, 8080, 8443) && !d.Topology.IsGateway {
 		add(models.DeviceTypeCandidate{
 			Type:            models.DeviceTypeServer,
@@ -252,6 +289,17 @@ func pickPrimaryType(d *models.DeviceIntelDevice) {
 }
 
 func guessOS(d *models.DeviceIntelDevice) {
+	if d.MobileFingerprint != nil && d.OSHint != models.MobileOSHintUnknown {
+		name := displayMobileOSName(d.OSHint)
+		d.OSGuess = models.OSGuess{
+			Family:      d.OSHint,
+			Name:        ptrString(name),
+			Confidence:  d.MobileFingerprint.Confidence,
+			Evidence:    mobileEvidenceExplanations(d.MobileFingerprint.Evidence),
+			EvidenceIDs: d.EvidenceIDs,
+		}
+		return
+	}
 	if hasOpenPort(d, 445) && (hasAnyPort(d, 135, 139, 5357) || len(d.NBNSRecords) > 0) {
 		d.OSGuess = models.OSGuess{
 			Family:      "windows",
@@ -268,6 +316,27 @@ func guessOS(d *models.DeviceIntelDevice) {
 		Evidence:    []string{"No safe OS-specific protocol evidence was conclusive."},
 		EvidenceIDs: nil,
 	}
+}
+
+func displayMobileOSName(osHint string) string {
+	switch osHint {
+	case models.MobileOSHintIOS:
+		return "iOS candidate"
+	case models.MobileOSHintIPadOS:
+		return "iPadOS candidate"
+	case models.MobileOSHintAndroid:
+		return "Android candidate"
+	default:
+		return "Mobile OS candidate"
+	}
+}
+
+func mobileEvidenceExplanations(items []models.MobileEvidenceItem) []string {
+	var out []string
+	for _, item := range items {
+		out = appendUnique(out, item.Explanation)
+	}
+	return out
 }
 
 func addSecurityFindings(d *models.DeviceIntelDevice) {

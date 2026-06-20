@@ -8,12 +8,18 @@ import { TopologyScreen } from './components/topology/TopologyScreen';
 import { DevicesScreen } from './components/devices/DevicesScreen';
 import { EvidenceScreen } from './components/evidence/EvidenceScreen';
 import { LaunchScreen } from './components/launch/LaunchScreen';
+import { LaunchChrome } from './components/launch/LaunchChrome';
 import { useUIStore } from './store/useUIStore';
 import { useScanStore } from './store/useScanStore';
+import { useScanEvents } from './lib/useScanEvents';
 
 export default function App() {
   const { activeScreen, setActiveScreen, isSidebarOpen, isInspectorOpen, isLogsOpen } = useUIStore();
   const hasReport = useScanStore((s) => s.report !== null);
+  const scanStatus = useScanStore((s) => s.scanStatus);
+
+  // Subscribe the store to backend scan lifecycle events (or polling fallback).
+  useScanEvents();
 
   // Handle system dark mode matching
   useEffect(() => {
@@ -22,16 +28,26 @@ export default function App() {
     }
   }, []);
 
-  // Before any scan/import, the entry point is the Wireshark-style launch screen.
-  const mainCanvas = !hasReport ? (
-    <LaunchScreen />
-  ) : activeScreen === 'devices' ? (
-    <DevicesScreen />
-  ) : activeScreen === 'evidence' ? (
-    <EvidenceScreen />
-  ) : (
-    <TopologyScreen />
-  );
+  // The launch screen is only the entry point while truly idle. As soon as a
+  // scan starts — or a report is loaded — we swap to the full workspace so the
+  // live topology dashboard is visible and the UI never blocks on "Scanning…".
+  const inWorkspace = hasReport || scanStatus !== 'idle';
+  if (!inWorkspace) {
+    return (
+      <LaunchChrome>
+        <LaunchScreen />
+      </LaunchChrome>
+    );
+  }
+
+  const mainCanvas =
+    activeScreen === 'devices' ? (
+      <DevicesScreen />
+    ) : activeScreen === 'evidence' ? (
+      <EvidenceScreen />
+    ) : (
+      <TopologyScreen />
+    );
 
   return (
     <DesktopLayout

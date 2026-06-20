@@ -19,9 +19,33 @@ export interface AgentBridge {
 
   /**
    * Triggers a new network scan on the Go backend, optionally pinned to a
-   * specific interface name.
+   * specific interface name. Blocking: resolves with the full report JSON only
+   * when the scan finishes. Preserved for environments without Wails events.
    */
   runScan(mode?: ScanMode, iface?: string): Promise<string>;
+
+  /**
+   * Starts a non-blocking, event-driven scan and resolves with a scan id
+   * immediately. Progress/results arrive via the scan:* / topology:* events.
+   * Returns null if the backend binding is unavailable (e.g. browser dev).
+   */
+  startScan(mode?: ScanMode, iface?: string): Promise<string | null>;
+
+  /** Cancels the in-flight managed scan, if any. */
+  cancelScan(): Promise<void>;
+
+  /** Returns the raw JSON of the most recent successful scan (or ''). */
+  latestSnapshot(): Promise<string>;
+
+  /**
+   * Subscribes to a Wails runtime event. Returns an unsubscribe function, or a
+   * no-op when the runtime is unavailable. The callback receives the first
+   * event payload argument.
+   */
+  onScanEvent(name: string, callback: (payload: any) => void): () => void;
+
+  /** True when Wails runtime events are available in this environment. */
+  hasEvents(): boolean;
 
   /**
    * Prompts the user to select a JSON report file to import.
@@ -58,6 +82,9 @@ declare global {
         App?: {
           ListInterfaces?: () => Promise<string>;
           RunScan?: (mode: string, iface: string) => Promise<string>;
+          StartScan?: (mode: string, iface: string) => Promise<string>;
+          CancelScan?: () => Promise<void>;
+          LatestSnapshot?: () => Promise<string>;
           ImportReport?: () => Promise<string>;
           ExportReport?: () => Promise<string>;
           SaveExport?: (filename: string, content: string) => Promise<void>;
@@ -65,8 +92,8 @@ declare global {
       };
     };
     runtime?: {
-      EventsOn?: (eventName: string, callback: (...args: any[]) => void) => void;
-      EventsOff?: (eventName: string) => void;
+      EventsOn?: (eventName: string, callback: (...args: any[]) => void) => (() => void) | void;
+      EventsOff?: (eventName: string, ...additional: string[]) => void;
     };
   }
 }
@@ -92,6 +119,42 @@ export const wailsBridge: AgentBridge = {
     }
     console.warn('Wails binding RunScan not found. Running in browser?');
     return '';
+  },
+
+  startScan: async (mode: ScanMode = 'full', iface = '') => {
+    if (window.go?.main?.App?.StartScan) {
+      return await window.go.main.App.StartScan(mode, iface);
+    }
+    return null;
+  },
+
+  cancelScan: async () => {
+    if (window.go?.main?.App?.CancelScan) {
+      await window.go.main.App.CancelScan();
+    }
+  },
+
+  latestSnapshot: async () => {
+    if (window.go?.main?.App?.LatestSnapshot) {
+      return await window.go.main.App.LatestSnapshot();
+    }
+    return '';
+  },
+
+  hasEvents: () => Boolean(window.runtime?.EventsOn),
+
+  onScanEvent: (name, callback) => {
+    if (!window.runtime?.EventsOn) return () => {};
+    // Wails' EventsOn returns its own unsubscribe in newer versions; fall back
+    // to EventsOff(name) when it does not so unmount cleanup always works.
+    const off = window.runtime.EventsOn(name, (...args: any[]) => callback(args[0]));
+    return () => {
+      if (typeof off === 'function') {
+        off();
+      } else if (window.runtime?.EventsOff) {
+        window.runtime.EventsOff(name);
+      }
+    };
   },
 
   importReport: async () => {

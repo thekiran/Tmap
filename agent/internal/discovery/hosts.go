@@ -50,8 +50,15 @@ type Resolver interface {
 func profilePorts(profile string) []int {
 	switch profile {
 	case "deep", "full":
-		return []int{22, 23, 25, 53, 80, 110, 135, 139, 143, 443, 445, 587, 993, 995,
-			1883, 3389, 5000, 5060, 5357, 7547, 8080, 8443, 8843, 9000, 49152}
+		// Widest liveness set: common OS/admin services plus ports that reveal
+		// printers (515/631/9100), IP cameras (554), UPnP/DLNA (1900/2869/8200),
+		// VNC (5900), embedded web UIs, media servers (32400) and phones (62078).
+		return []int{
+			21, 22, 23, 25, 53, 80, 81, 88, 110, 111, 135, 139, 143, 443, 445,
+			515, 554, 587, 631, 993, 995, 1883, 1900, 2869, 3389, 5000, 5060,
+			5357, 5900, 7547, 8000, 8080, 8081, 8123, 8200, 8443, 8843, 9000,
+			9100, 32400, 49152, 62078,
+		}
 	case "normal", "standard":
 		return []int{22, 23, 53, 80, 135, 139, 443, 445, 3389, 5357, 7547, 8080, 8443}
 	default: // quick

@@ -2,7 +2,7 @@ import type { NetworkDevice, TopologyEdge, TopologyNode } from './models';
 
 type DeviceLike = Pick<
   NetworkDevice,
-  'ip' | 'hostname' | 'isAgent' | 'isGateway' | 'isUnknown' | 'discoverySources' | 'reachability'
+  'ip' | 'hostname' | 'isAgent' | 'isGateway' | 'isUnknown' | 'discoverySources' | 'reachability' | 'roles'
 >;
 
 export function discoverySourceLabel(source: string): string {
@@ -27,6 +27,7 @@ export function discoverySourceBadges(sources: string[], reachability?: string):
 export function deviceDisplayTitle(device: DeviceLike): string {
   if (device.isAgent) return 'This PC';
   if (device.isGateway) return 'Gateway / Router';
+  if (hasUpstreamGatewayRole(device.roles)) return 'Upstream gateway / CPE';
   if (device.isUnknown) return device.ip;
   return device.hostname ?? device.ip;
 }
@@ -40,8 +41,16 @@ export function deviceSecondaryHostname(device: DeviceLike): string | null {
 export function nodeDisplayTitle(node: TopologyNode): string {
   if (node.isAgent) return 'This PC';
   if (node.isGateway) return 'Gateway / Router';
+  if (hasUpstreamGatewayRole(node.roles)) return 'Upstream gateway / CPE';
   if (node.isUnknown) return String((node as { ip?: string }).ip ?? node.sublabel ?? node.label);
   return node.label;
+}
+
+function hasUpstreamGatewayRole(roles: string[] = []): boolean {
+  return roles.some((role) => {
+    const lower = role.toLowerCase();
+    return lower === 'upstream_private_gateway' || lower === 'possible_cpe';
+  });
 }
 
 export function nodeIp(node: TopologyNode): string | null {

@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/thekiran/iad/internal/topology"
 	"github.com/thekiran/iad/pkg/models"
 )
 
@@ -32,9 +33,16 @@ func enrichReport(report *models.ScanReport, opts reportEnrichmentOptions) {
 		NmapRequested:           opts.NmapRequested,
 		NmapAvailable:           opts.NmapAvailable,
 	})
+	report.Agent.Capabilities = append([]models.ReportCapability{}, report.Capabilities...)
 	report.InterfaceSelection = buildInterfaceSelection(*report, opts)
 	report.ProbeInventory = buildProbeInventory(*report, opts)
 	report.EvidenceRegistry = buildEvidenceRegistry(*report)
+	rich := topology.BuildRichTopology(*report)
+	report.RichTopology = &rich
+	topologyV2 := topology.BuildTopologyV2(*report, rich)
+	report.Topology = &topologyV2
+	report.Wireless = topology.BuildWirelessMetadata(rich)
+	report.RawObservations = topology.BuildRawObservations(*report)
 	report.UI = buildReportUI(*report)
 	report.RedactionMode = opts.RedactionMode
 	report.Privacy = models.PrivacyOptions{
@@ -276,10 +284,15 @@ func buildUIGraph(report models.ScanReport) models.UIGraph {
 			Inferred:   false,
 			Badges:     append([]string{}, d.Roles...),
 			Metadata: map[string]any{
-				"is_agent":     d.IsAgent,
-				"is_gateway":   d.IsGateway,
-				"addresses":    d.Addresses,
-				"evidence_ids": d.EvidenceIDs,
+				"is_agent":          d.IsAgent,
+				"is_gateway":        d.IsGateway,
+				"addresses":         d.Addresses,
+				"evidence_ids":      d.EvidenceIDs,
+				"mobileFingerprint": d.MobileFingerprint,
+				"deviceTypeHint":    d.DeviceTypeHint,
+				"osHint":            d.OSHint,
+				"osConfidence":      d.OSConfidence,
+				"mobile_label":      mobileLabelLocal(d.MobileFingerprint),
 			},
 		})
 	}
@@ -304,13 +317,17 @@ func buildUIDeviceDetails(report models.ScanReport) []map[string]any {
 	out := make([]map[string]any, 0, len(report.Devices))
 	for _, d := range report.Devices {
 		out = append(out, map[string]any{
-			"id":           d.ID,
-			"label":        deviceLabel(d),
-			"addresses":    d.Addresses,
-			"roles":        d.Roles,
-			"services":     d.Services,
-			"confidence":   d.Confidence,
-			"evidence_ids": d.EvidenceIDs,
+			"id":                d.ID,
+			"label":             deviceLabel(d),
+			"addresses":         d.Addresses,
+			"roles":             d.Roles,
+			"services":          d.Services,
+			"confidence":        d.Confidence,
+			"evidence_ids":      d.EvidenceIDs,
+			"mobileFingerprint": d.MobileFingerprint,
+			"deviceTypeHint":    d.DeviceTypeHint,
+			"osHint":            d.OSHint,
+			"osConfidence":      d.OSConfidence,
 		})
 	}
 	return out
@@ -491,6 +508,22 @@ func applyReportRedaction(report *models.ScanReport) {
 					report.Devices[i].Interfaces[j].MAC = "xx:xx:xx:xx:xx:xx"
 				}
 			}
+			redactMobileFingerprint(report.Devices[i].MobileFingerprint, true, false)
+		}
+		if report.DeviceIntel != nil {
+			for i := range report.DeviceIntel.Devices {
+				redactMobileFingerprint(report.DeviceIntel.Devices[i].MobileFingerprint, true, false)
+			}
+		}
+		if report.RichTopology != nil {
+			for i := range report.RichTopology.Nodes {
+				redactMobileFingerprint(report.RichTopology.Nodes[i].MobileFingerprint, true, false)
+			}
+		}
+		if report.Topology != nil {
+			for i := range report.Topology.Nodes {
+				redactMobileFingerprint(report.Topology.Nodes[i].MobileFingerprint, true, false)
+			}
 		}
 	}
 	if report.Privacy.MaskHostnames {
@@ -498,6 +531,22 @@ func applyReportRedaction(report *models.ScanReport) {
 		for i := range report.Devices {
 			if report.Devices[i].Hostname != "" {
 				report.Devices[i].Hostname = "redacted-host"
+			}
+			redactMobileFingerprint(report.Devices[i].MobileFingerprint, false, true)
+		}
+		if report.DeviceIntel != nil {
+			for i := range report.DeviceIntel.Devices {
+				redactMobileFingerprint(report.DeviceIntel.Devices[i].MobileFingerprint, false, true)
+			}
+		}
+		if report.RichTopology != nil {
+			for i := range report.RichTopology.Nodes {
+				redactMobileFingerprint(report.RichTopology.Nodes[i].MobileFingerprint, false, true)
+			}
+		}
+		if report.Topology != nil {
+			for i := range report.Topology.Nodes {
+				redactMobileFingerprint(report.Topology.Nodes[i].MobileFingerprint, false, true)
 			}
 		}
 	}
@@ -512,6 +561,24 @@ func applyReportRedaction(report *models.ScanReport) {
 			}
 			if ctx.NATTopology.STUNPublicIP != "" {
 				ctx.NATTopology.STUNPublicIP = "x.x.x.x"
+			}
+		}
+	}
+}
+
+func redactMobileFingerprint(fp *models.MobileFingerprint, maskMAC, maskHostnames bool) {
+	if fp == nil {
+		return
+	}
+	for i := range fp.Evidence {
+		switch fp.Evidence[i].Type {
+		case models.MobileEvidenceTypeMACOUI:
+			if maskMAC {
+				fp.Evidence[i].Value = "xx:xx:xx:xx:xx:xx"
+			}
+		case models.MobileEvidenceTypeHostname, models.MobileEvidenceTypeDHCPHostname, models.MobileEvidenceTypeMDNS:
+			if maskHostnames {
+				fp.Evidence[i].Value = "redacted-host"
 			}
 		}
 	}
@@ -677,6 +744,38 @@ func deviceTypeForUI(d models.Device) string {
 		return "host_with_services"
 	}
 	return "host"
+}
+
+func mobileLabelLocal(fp *models.MobileFingerprint) string {
+	if fp == nil {
+		return ""
+	}
+	switch fp.Classification {
+	case models.MobileClassificationConfirmedIOS:
+		return "Confirmed iPhone"
+	case models.MobileClassificationProbableIOS:
+		return "Probable iPhone"
+	case models.MobileClassificationPossibleIOS:
+		return "Possible iPhone"
+	case models.MobileClassificationConfirmedIPadOS:
+		return "Confirmed iPad"
+	case models.MobileClassificationProbableIPadOS:
+		return "Probable iPad"
+	case models.MobileClassificationPossibleIPadOS:
+		return "Possible iPad"
+	case models.MobileClassificationConfirmedAndroid:
+		return "Confirmed Android"
+	case models.MobileClassificationProbableAndroid:
+		return "Probable Android"
+	case models.MobileClassificationPossibleAndroid:
+		return "Possible Android"
+	case models.MobileClassificationConflict:
+		return "Conflicting mobile OS evidence"
+	case models.MobileClassificationUnknownMobile:
+		return "Unknown mobile"
+	default:
+		return ""
+	}
 }
 
 func warningMessages(warnings []models.Warning) []string {

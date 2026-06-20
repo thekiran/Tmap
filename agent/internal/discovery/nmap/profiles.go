@@ -14,12 +14,17 @@ const (
 
 // ArgsForProfile returns Nmap arguments for a profile, excluding the target.
 // Unknown profiles fall back to quick.
+//
+// The deep/full profile is the most thorough connect scan we run: 2000 ports
+// with service/version detection. A per-host timeout keeps a single slow or
+// filtered host from consuming the whole scan budget, so the scan finishes and
+// its results are actually merged in rather than discarded on overall timeout.
 func ArgsForProfile(profile string) []string {
 	switch profile {
 	case ProfileDeep, ProfileFull:
-		return []string{"-sT", "-T4", "-p", "1-2000", "-sV", "--version-light", "-oX", "-"}
+		return []string{"-sT", "-T4", "-p", "1-2000", "-sV", "--version-light", "--max-retries", "2", "--host-timeout", "60s", "-oX", "-"}
 	case ProfileStandard, ProfileNormal:
-		return []string{"-sT", "-T4", "--top-ports", "1000", "-sV", "--version-light", "-oX", "-"}
+		return []string{"-sT", "-T4", "--top-ports", "1000", "-sV", "--version-light", "--host-timeout", "45s", "-oX", "-"}
 	default:
 		return []string{"-sT", "-T4", "-F", "-oX", "-"}
 	}

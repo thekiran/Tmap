@@ -96,6 +96,10 @@ type DeviceIntelDevice struct {
 	MACAddresses              []string             `json:"mac_addresses,omitempty"`
 	Hostnames                 []string             `json:"hostnames,omitempty"`
 	Vendor                    DeviceVendor         `json:"vendor"`
+	MobileFingerprint         *MobileFingerprint   `json:"mobileFingerprint,omitempty"`
+	DeviceTypeHint            string               `json:"deviceTypeHint,omitempty"`
+	OSHint                    string               `json:"osHint,omitempty"`
+	OSConfidence              float64              `json:"osConfidence,omitempty"`
 	Roles                     []string             `json:"roles,omitempty"`
 	DeviceType                DeviceTypeGuess      `json:"device_type"`
 	OSGuess                   OSGuess              `json:"os_guess"`
@@ -120,6 +124,56 @@ type DeviceIntelDevice struct {
 	LastSeen                  string               `json:"last_seen,omitempty"`
 	ClassificationExplanation []string             `json:"classification_explanation,omitempty"`
 	UndeterminedWithoutOptIn  []string             `json:"undetermined_without_credentials_or_physical_evidence,omitempty"`
+
+	// Upstream-gateway enrichment (see internal/upstream). These are populated
+	// for gateway/upstream/CPE candidates by the dedicated read-only enrichment
+	// phase; they stay nil/empty for ordinary LAN devices.
+	Reachability       *DeviceReachability `json:"reachability,omitempty"`
+	RoutingEvidence    *RoutingEvidence    `json:"routing_evidence,omitempty"`
+	ClassificationTags []string            `json:"classification_tags,omitempty"`
+	IntelEvidence      []IntelEvidenceItem `json:"intel_evidence,omitempty"`
+	EnrichmentWarnings []string            `json:"enrichment_warnings,omitempty"`
+}
+
+// DeviceReachability captures how (and whether) a device answered safe,
+// read-only reachability probes. ICMP fields come from a short system ping;
+// when ICMP is blocked the values fall back to TCP-connect timing.
+type DeviceReachability struct {
+	ICMP              bool     `json:"icmp"`
+	TCPReachable      bool     `json:"tcp_reachable"`
+	AvgLatencyMs      *float64 `json:"avg_latency_ms,omitempty"`
+	MinLatencyMs      *float64 `json:"min_latency_ms,omitempty"`
+	MaxLatencyMs      *float64 `json:"max_latency_ms,omitempty"`
+	PacketLoss        *float64 `json:"packet_loss,omitempty"`
+	TTL               *int     `json:"ttl,omitempty"`
+	HopDistance       *int     `json:"hop_distance,omitempty"`
+	DirectlyReachable bool     `json:"directly_reachable"`
+	Method            string   `json:"method"` // icmp_ping | tcp_connect | none
+	Note              string   `json:"note,omitempty"`
+}
+
+// RoutingEvidence is the topology/routing interpretation of an upstream device.
+type RoutingEvidence struct {
+	// Kind is one of: default_gateway, upstream_private_gateway,
+	// double_nat_upstream, isp_cpe, bridged, stale_route, virtual_or_docker,
+	// unreachable_inferred, unknown.
+	Kind              string   `json:"kind"`
+	DoubleNAT         bool     `json:"double_nat"`
+	PrivateUpstream   bool     `json:"private_upstream"`
+	SameSubnetAsAgent bool     `json:"same_subnet_as_agent"`
+	HopDistance       *int     `json:"hop_distance,omitempty"`
+	Notes             []string `json:"notes,omitempty"`
+}
+
+// IntelEvidenceItem is a single weighted signal that fed the upstream
+// classification. The sum of ConfidenceImpact values (clamped to [0,1]) is the
+// device confidence. Named distinctly from the access-detection EvidenceItem.
+type IntelEvidenceItem struct {
+	Type             string  `json:"type"`
+	Value            string  `json:"value"`
+	Source           string  `json:"source"`
+	ConfidenceImpact float64 `json:"confidence_impact"`
+	Timestamp        string  `json:"timestamp"`
 }
 
 type DeviceVendor struct {
@@ -300,17 +354,20 @@ type DeviceIntelUI struct {
 }
 
 type DeviceCard struct {
-	DeviceID        string   `json:"device_id"`
-	Title           string   `json:"title"`
-	Role            string   `json:"role"`
-	Confidence      float64  `json:"confidence"`
-	MACVendor       string   `json:"mac_vendor,omitempty"`
-	Hostnames       []string `json:"hostnames,omitempty"`
-	OpenServices    []string `json:"open_services,omitempty"`
-	DeviceType      string   `json:"device_type"`
-	OSGuess         string   `json:"os_guess"`
-	LastSeen        string   `json:"last_seen,omitempty"`
-	EvidenceSources []string `json:"evidence_sources,omitempty"`
-	RiskNotes       []string `json:"risk_notes,omitempty"`
-	Explanation     []string `json:"why_this_classification,omitempty"`
+	DeviceID         string   `json:"device_id"`
+	Title            string   `json:"title"`
+	Role             string   `json:"role"`
+	Confidence       float64  `json:"confidence"`
+	MACVendor        string   `json:"mac_vendor,omitempty"`
+	Hostnames        []string `json:"hostnames,omitempty"`
+	MobileLabel      string   `json:"mobile_label,omitempty"`
+	MobileOSHint     string   `json:"mobile_os_hint,omitempty"`
+	MobileConfidence float64  `json:"mobile_confidence,omitempty"`
+	OpenServices     []string `json:"open_services,omitempty"`
+	DeviceType       string   `json:"device_type"`
+	OSGuess          string   `json:"os_guess"`
+	LastSeen         string   `json:"last_seen,omitempty"`
+	EvidenceSources  []string `json:"evidence_sources,omitempty"`
+	RiskNotes        []string `json:"risk_notes,omitempty"`
+	Explanation      []string `json:"why_this_classification,omitempty"`
 }

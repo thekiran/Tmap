@@ -59,8 +59,9 @@ export function deviceIconKey(type: string): string {
     local_host: 'host', workstation: 'host', interface: 'plug', subnet: 'layers',
     default_gateway: 'router', router: 'router', modem_cpe: 'modem',
     access_point: 'ap', mesh_node: 'ap', repeater: 'ap',
+    wireless_client: 'mobile', wired_client: 'host',
     managed_switch: 'switch', unmanaged_switch_inferred: 'switch', unknown_l2_segment: 'unknown',
-    server: 'server', dns_server: 'server', printer: 'printer', mobile: 'mobile', iot: 'iot',
+    server: 'server', dns_server: 'server', printer: 'printer', mobile: 'mobile', phone: 'mobile', iot: 'iot',
     isp_gateway: 'globe', isp_route_hop: 'globe', public_internet: 'globe', unknown: 'unknown',
   };
   return map[type] ?? 'unknown';

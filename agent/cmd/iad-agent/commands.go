@@ -18,6 +18,7 @@ import (
 	"github.com/thekiran/iad/internal/probes"
 	"github.com/thekiran/iad/internal/system"
 	"github.com/thekiran/iad/internal/topology"
+	"github.com/thekiran/iad/internal/upstream"
 	"github.com/thekiran/iad/pkg/models"
 )
 
@@ -73,6 +74,7 @@ func runScan(args []string) error {
 	allowPublic := fs.Bool("allow-public", false, "permit non-private scopes")
 	timeout := fs.Duration("timeout", 30*time.Second, "overall scan timeout")
 	rulesDir := fs.String("rules", "", "rules directory for --classify")
+	enrichUpstream := fs.Bool("enrich-upstream", true, "run the read-only upstream gateway enrichment phase (safe ping + TCP/HTTP/TLS fingerprint of private gateway/CPE candidates)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -143,7 +145,30 @@ func runScan(args []string) error {
 		}
 		report.AccessClassification = &classification
 	}
+	// Dedicated upstream-gateway enrichment: actively (but read-only) probe the
+	// private gateway/upstream/CPE candidates the LAN sweep never reaches (e.g.
+	// an off-subnet 192.168.1.1) so they get real reachability/service/HTTP/TLS
+	// evidence instead of an almost-empty card. Evidence is appended to the
+	// report BEFORE Build so the normal ingestion path surfaces services; the
+	// classification/reachability/routing are attached to the device AFTER Build.
+	var upstreamIntel map[string]upstream.IntelResult
+	if *enrichUpstream {
+		// Give enrichment its own bounded budget (independent of how much the
+		// discovery phase already consumed) so reachability/HTTP/TLS probes
+		// actually get to run. The desktop kills the process on cancel, so a
+		// Background-derived deadline never outlives a user cancel.
+		ictx, icancel := context.WithTimeout(context.Background(), 20*time.Second)
+		upstreamIntel = upstream.EnrichReport(ictx, report, upstream.Options{EnablePing: true})
+		icancel()
+		for _, r := range upstreamIntel {
+			report.Evidence = append(report.Evidence, r.Evidence...)
+		}
+	}
+
 	deviceIntel := deviceintel.Build(report)
+	if len(upstreamIntel) > 0 {
+		attachUpstreamIntel(&deviceIntel, upstreamIntel)
+	}
 	report.DeviceIntel = &deviceIntel
 	enrichReport(&report, reportEnrichmentOptions{
 		Full:                    *full,
@@ -257,8 +282,15 @@ func buildReportCapabilities(report models.ScanReport, opts reportCapabilityOpti
 			Name:        "topology_scan",
 			Category:    "topology",
 			Status:      "completed",
-			OutputPath:  "/devices,/edges,/evidence,/summary",
-			Description: "Builds the evidence-backed LAN device and topology view inside the validated scope.",
+			OutputPath:  "/topology,/devices,/edges,/evidence,/summary",
+			Description: "Builds the evidence-backed LAN device and iad.topology/v2 graph inside the validated scope.",
+		},
+		{
+			Name:        "topology_v2_graph",
+			Category:    "topology",
+			Status:      "completed",
+			OutputPath:  "/topology/nodes,/topology/edges",
+			Description: "Frontend-ready graph with evidence, confidence, explanations, warnings, wireless metadata, and conservative edge classification.",
 		},
 		{
 			Name:        "tcp_lan_sweep",
@@ -266,6 +298,27 @@ func buildReportCapabilities(report models.ScanReport, opts reportCapabilityOpti
 			Status:      "completed",
 			OutputPath:  "/devices",
 			Description: fmt.Sprintf("Uses the %s profile to discover live hosts and common open services.", opts.Profile),
+		},
+		{
+			Name:        "passive_lan_observer",
+			Category:    "passive_observation",
+			Status:      "available",
+			OutputPath:  "/raw_observations",
+			Description: "Metadata-only passive LAN observation abstraction is available; payload bodies, cookies, tokens, and credentials are not stored.",
+		},
+		{
+			Name:        "mobile_fingerprint_engine",
+			Category:    "device_intel",
+			Status:      "completed",
+			OutputPath:  "/devices/mobileFingerprint,/device_intel/devices/mobileFingerprint,/topology/nodes/mobileFingerprint",
+			Description: "Scores iOS/iPadOS and Android separately from local metadata, keeps evidence and conflicts visible, and avoids unsafe probes or fake conclusions.",
+		},
+		{
+			Name:       "passive_wifi_observer",
+			Category:   "wireless",
+			Status:     "unsupported",
+			OutputPath: "/wireless,/warnings",
+			Reason:     "No monitor/radiotap backend is configured by default; unsupported is expected on many Windows adapters.",
 		},
 	}
 
@@ -420,4 +473,45 @@ func resolveRulesDir(flagDir string) (string, error) {
 		}
 	}
 	return "", fatalf("could not locate rules directory; pass --rules <dir>")
+}
+
+// attachUpstreamIntel copies the upstream enrichment results onto the matching
+// device-intel devices (by IP). Classification confidence only ever raises the
+// device confidence — it never lowers an already-stronger signal.
+func attachUpstreamIntel(intel *models.DeviceIntelReport, results map[string]upstream.IntelResult) {
+	for i := range intel.Devices {
+		d := &intel.Devices[i]
+		for _, ip := range d.IPAddresses {
+			r, ok := results[ip]
+			if !ok {
+				continue
+			}
+			reach := r.Reachability
+			routing := r.Routing
+			d.Reachability = &reach
+			d.RoutingEvidence = &routing
+			d.ClassificationTags = r.Classification.Tags
+			d.IntelEvidence = r.Classification.Evidence
+			d.EnrichmentWarnings = appendUniqueStrings(d.EnrichmentWarnings, r.Warnings...)
+			if r.Classification.Confidence > d.Confidence {
+				d.Confidence = r.Classification.Confidence
+			}
+			break
+		}
+	}
+}
+
+func appendUniqueStrings(values []string, next ...string) []string {
+	seen := make(map[string]bool, len(values))
+	for _, v := range values {
+		seen[v] = true
+	}
+	for _, v := range next {
+		if v == "" || seen[v] {
+			continue
+		}
+		seen[v] = true
+		values = append(values, v)
+	}
+	return values
 }

@@ -25,7 +25,7 @@ func Build(report models.ScanReport) models.DeviceIntelReport {
 	ingestEvidenceRecords(report, store, evidenceByID, scope)
 	ingestAccessContext(report, store, evidenceByID, scope)
 	edges := convertEdges(report, store)
-	classifyAll(store)
+	classifyAllWithEvidence(store, report.Evidence)
 
 	devices := store.DeviceList()
 	out := models.DeviceIntelReport{
@@ -92,6 +92,13 @@ func ingestTopologyDevices(report models.ScanReport, store *EvidenceStore, evide
 			store.AddHostname(ip, src.Hostname, "topology_device", firstEvidence(src.EvidenceIDs), 0.55)
 		}
 		dst.Roles = appendUnique(dst.Roles, src.Roles...)
+		if src.MobileFingerprint != nil {
+			fp := *src.MobileFingerprint
+			dst.MobileFingerprint = &fp
+			dst.DeviceTypeHint = src.DeviceTypeHint
+			dst.OSHint = src.OSHint
+			dst.OSConfidence = src.OSConfidence
+		}
 		dst.Topology.IsAgent = src.IsAgent
 		dst.Topology.IsGateway = src.IsGateway
 		dst.Confidence = maxFloat(dst.Confidence, src.Confidence)
@@ -415,25 +422,59 @@ func buildUI(report models.DeviceIntelReport) models.DeviceIntelUI {
 	}
 	for _, d := range report.Devices {
 		card := models.DeviceCard{
-			DeviceID:        d.ID,
-			Title:           deviceTitle(d),
-			Role:            strings.Join(d.Roles, " / "),
-			Confidence:      d.Confidence,
-			Hostnames:       d.Hostnames,
-			OpenServices:    serviceLabels(d.Services),
-			DeviceType:      d.DeviceType.Primary,
-			OSGuess:         d.OSGuess.Family,
-			LastSeen:        d.LastSeen,
-			EvidenceSources: evidenceSources(report.Evidence, d.EvidenceIDs),
-			RiskNotes:       riskNotes(d.SecurityPosture.Findings),
-			Explanation:     d.ClassificationExplanation,
+			DeviceID:         d.ID,
+			Title:            deviceTitle(d),
+			Role:             strings.Join(d.Roles, " / "),
+			Confidence:       d.Confidence,
+			Hostnames:        d.Hostnames,
+			MobileOSHint:     d.OSHint,
+			MobileConfidence: d.OSConfidence,
+			OpenServices:     serviceLabels(d.Services),
+			DeviceType:       d.DeviceType.Primary,
+			OSGuess:          d.OSGuess.Family,
+			LastSeen:         d.LastSeen,
+			EvidenceSources:  evidenceSources(report.Evidence, d.EvidenceIDs),
+			RiskNotes:        riskNotes(d.SecurityPosture.Findings),
+			Explanation:      d.ClassificationExplanation,
 		}
 		if d.Vendor.OUIVendor != nil {
 			card.MACVendor = *d.Vendor.OUIVendor
 		}
+		if d.MobileFingerprint != nil {
+			card.MobileLabel = mobileCardLabel(d.MobileFingerprint.Classification)
+		}
 		ui.DeviceCards = append(ui.DeviceCards, card)
 	}
 	return ui
+}
+
+func mobileCardLabel(classification string) string {
+	switch classification {
+	case models.MobileClassificationConfirmedIOS:
+		return "Confirmed iPhone"
+	case models.MobileClassificationProbableIOS:
+		return "Probable iPhone"
+	case models.MobileClassificationPossibleIOS:
+		return "Possible iPhone"
+	case models.MobileClassificationConfirmedIPadOS:
+		return "Confirmed iPad"
+	case models.MobileClassificationProbableIPadOS:
+		return "Probable iPad"
+	case models.MobileClassificationPossibleIPadOS:
+		return "Possible iPad"
+	case models.MobileClassificationConfirmedAndroid:
+		return "Confirmed Android"
+	case models.MobileClassificationProbableAndroid:
+		return "Probable Android"
+	case models.MobileClassificationPossibleAndroid:
+		return "Possible Android"
+	case models.MobileClassificationConflict:
+		return "Conflicting mobile OS evidence"
+	case models.MobileClassificationUnknownMobile:
+		return "Unknown mobile"
+	default:
+		return ""
+	}
 }
 
 func deviceTitle(d models.DeviceIntelDevice) string {

@@ -30,6 +30,40 @@ export interface RiskFinding {
   evidenceIds: string[];
 }
 
+export interface MobileEvidenceItem {
+  id: string;
+  type: string;
+  value: string;
+  osHint: 'ios' | 'ipados' | 'android' | 'unknown';
+  confidenceImpact: number;
+  strength: 'strong' | 'medium' | 'weak';
+  source: string;
+  timestamp: string;
+  explanation: string;
+}
+
+export interface MobileConflictItem {
+  reason: string;
+  iosEvidenceIds: string[];
+  androidEvidenceIds: string[];
+  severity: 'info' | 'warning';
+  resolutionHint: string;
+}
+
+export interface MobileFingerprint {
+  classification: string;
+  iosScore: number;
+  androidScore: number;
+  ipadScore: number;
+  confidence: number;
+  evidence: MobileEvidenceItem[];
+  conflicts: MobileConflictItem[];
+  warnings: string[];
+  lastUpdatedAt: string | null;
+  whyThisClassification: string | null;
+  whyNotCertain: string | null;
+}
+
 export interface NetworkDevice {
   id: string;
   ips: string[];
@@ -51,8 +85,16 @@ export interface NetworkDevice {
   explanation: string | null;
   limitations: string | null;
   rawProbeRefs: string[];
+  evidenceCount: number;
+  rawSources: string[];
+  wireless: Record<string, unknown> | null;
   riskLevel: string | null;
   riskFindings: RiskFinding[];
+  mobileFingerprint: MobileFingerprint | null;
+  deviceTypeHint: 'phone' | 'tablet' | 'computer' | 'iot' | 'router' | 'unknown' | null;
+  osHint: 'ios' | 'ipados' | 'android' | 'unknown' | null;
+  osConfidence: number | null;
+  osEvidenceSummary: string[];
   raw: Record<string, unknown>;
 }
 
@@ -172,6 +214,18 @@ export interface TopologyNode {
   isGateway: boolean;
   isAgent: boolean;
   isUnknown: boolean;
+  ip?: string | null;
+  mac?: string | null;
+  vendor?: string | null;
+  role?: string | null;
+  evidenceCount?: number;
+  wireless?: Record<string, unknown> | null;
+  rawSources?: string[];
+  mobileFingerprint?: MobileFingerprint | null;
+  deviceTypeHint?: NetworkDevice['deviceTypeHint'];
+  osHint?: NetworkDevice['osHint'];
+  osConfidence?: number | null;
+  osEvidenceSummary?: string[];
 }
 
 export interface TopologyEdge {
@@ -191,6 +245,13 @@ export interface TopologyEdge {
   inferred: boolean;
   lineStyle: 'solid' | 'dashed' | 'dotted';
   layers: ('l2' | 'l3' | 'nat' | 'isp' | 'unknown')[];
+  relation?: string | null;
+  medium?: string | null;
+  explanation?: string | null;
+  warnings?: string[];
+  evidence?: Record<string, unknown>[];
+  evidenceIds?: string[];
+  rawEdge?: Record<string, unknown>;
 }
 
 export interface TopologyViewModel {

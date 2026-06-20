@@ -8,6 +8,8 @@
     "desktop:dev": "npm --workspace iad-console-frontend run dev",
     "desktop:build": "npm --workspace iad-console-frontend run build",
     "desktop:typecheck": "npm --workspace iad-console-frontend run typecheck",
+    "desktop:test": "npm --workspace iad-console-frontend run test",
+    "desktop:e2e": "npm --workspace iad-console-frontend run test:e2e",
     "desktop:preview": "npm --workspace iad-console-frontend run preview"
   }
 }

@@ -1,6 +1,6 @@
 import { useUIStore } from '../../store/useUIStore';
 import { useScanStore } from '../../store/useScanStore';
-import type { NetworkDevice, TopologyEdge } from '../../lib/models';
+import type { MobileFingerprint, NetworkDevice, TopologyEdge } from '../../lib/models';
 import {
   UNKNOWN_DEVICE_REASON,
   deviceDisplayTitle,
@@ -8,6 +8,7 @@ import {
   discoverySourceBadges,
   formatTopologyEdgeLabel,
 } from '../../lib/topology-display';
+import { findUpstreamIntel, routingHeadline, tagLabel, type UpstreamIntel } from '../../lib/upstream-intel';
 
 export function Inspector() {
   const { selectedDeviceId, selectedEdgeId, toggleInspector } = useUIStore();
@@ -75,11 +76,126 @@ function ConfidenceBar({ value }: { value: number }) {
   );
 }
 
+function mobileLabel(classification: string): string {
+  switch (classification) {
+    case 'confirmed_ios': return 'Confirmed iPhone';
+    case 'probable_ios': return 'Probable iPhone';
+    case 'possible_ios': return 'Possible iPhone';
+    case 'confirmed_ipados': return 'Confirmed iPad';
+    case 'probable_ipados': return 'Probable iPad';
+    case 'possible_ipados': return 'Possible iPad';
+    case 'confirmed_android': return 'Confirmed Android';
+    case 'probable_android': return 'Probable Android';
+    case 'possible_android': return 'Possible Android';
+    case 'conflicting_mobile_os_evidence': return 'Conflicting mobile OS evidence';
+    case 'unknown_mobile': return 'Unknown mobile';
+    default: return 'Unknown device';
+  }
+}
+
+function hintLabel(value: string | null | undefined): string {
+  if (!value || value === 'unknown') return 'Unknown';
+  return value.replace(/_/g, ' ');
+}
+
+function MobileFingerprintSection({ fingerprint, device }: { fingerprint: MobileFingerprint; device: NetworkDevice }) {
+  const dnsEvidence = fingerprint.evidence.some((item) => item.type === 'dns_query');
+  const visibleEvidence = fingerprint.evidence.slice(0, 8);
+
+  return (
+    <Section title="Mobile OS Fingerprint">
+      <div className="space-y-3 text-xs">
+        <div className="rounded-md border border-sky-500/25 bg-sky-500/[0.06] p-3">
+          <Row label="Classification" value={mobileLabel(fingerprint.classification)} />
+          <Row label="Device type hint" value={<span className="capitalize">{hintLabel(device.deviceTypeHint)}</span>} />
+          <Row label="OS hint" value={hintLabel(device.osHint)} mono />
+          <Row label="iOS score" value={`${fingerprint.iosScore} / 100`} mono />
+          <Row label="iPadOS score" value={`${fingerprint.ipadScore} / 100`} mono />
+          <Row label="Android score" value={`${fingerprint.androidScore} / 100`} mono />
+          <Row label="Last updated" value={fingerprint.lastUpdatedAt ?? 'Unknown'} mono />
+          <div className="mt-2">
+            <ConfidenceBar value={fingerprint.confidence} />
+          </div>
+        </div>
+
+        {fingerprint.whyThisClassification && (
+          <p className="leading-relaxed text-zinc-600 dark:text-zinc-400">{fingerprint.whyThisClassification}</p>
+        )}
+        {fingerprint.whyNotCertain && (
+          <p className="leading-relaxed text-zinc-500">{fingerprint.whyNotCertain}</p>
+        )}
+
+        {device.osEvidenceSummary.length > 0 && (
+          <div>
+            <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-zinc-500">Evidence summary</div>
+            <ul className="space-y-1">
+              {device.osEvidenceSummary.map((item, index) => (
+                <li key={`${item}-${index}`} className="rounded bg-zinc-100 px-2 py-1 dark:bg-zinc-800/60">{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {visibleEvidence.length > 0 && (
+          <div>
+            <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-zinc-500">Evidence</div>
+            <ul className="space-y-1">
+              {visibleEvidence.map((item) => (
+                <li key={item.id} className="rounded bg-zinc-100 px-2 py-1 dark:bg-zinc-800/60">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate">{item.explanation || item.value}</span>
+                    <span className="shrink-0 font-mono text-[10px] text-zinc-500">+{item.confidenceImpact}</span>
+                  </div>
+                  <div className="mt-0.5 font-mono text-[10px] uppercase tracking-wide text-zinc-500">
+                    {item.type.replace(/_/g, ' ')} / {item.strength}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {fingerprint.conflicts.length > 0 && (
+          <div>
+            <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-amber-500">Conflicts</div>
+            <ul className="space-y-1">
+              {fingerprint.conflicts.map((conflict, index) => (
+                <li key={index} className="rounded border border-amber-500/30 bg-amber-500/5 px-2 py-1 text-amber-700 dark:text-amber-300">
+                  {conflict.reason}
+                  {conflict.resolutionHint && <div className="mt-0.5 text-[11px] opacity-80">{conflict.resolutionHint}</div>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {fingerprint.warnings.length > 0 && (
+          <div>
+            <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-zinc-500">Warnings</div>
+            <ul className="space-y-1">
+              {fingerprint.warnings.map((warning, index) => (
+                <li key={index} className="rounded border border-zinc-700/70 px-2 py-1 text-zinc-500">{warning}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {dnsEvidence && (
+          <p className="rounded border border-sky-500/25 bg-sky-500/5 px-2 py-1 text-[11px] text-sky-700 dark:text-sky-300">
+            Passive DNS is shown only as matched OS-related domain hints; raw browsing history and packet payloads are not displayed.
+          </p>
+        )}
+      </div>
+    </Section>
+  );
+}
+
 function DeviceDetails({ device, normalized }: { device: NetworkDevice; normalized: NonNullable<ReturnType<typeof useScanStore.getState>['normalized']> }) {
   const openServices = device.services.filter((s) => (s.state ?? '').toLowerCase() === 'open');
   const evidence = normalized.evidence.filter((e) => device.rawProbeRefs.includes(e.id));
   const discovery = discoverySourceBadges(device.discoverySources, device.reachability);
   const secondaryHostname = deviceSecondaryHostname(device);
+  const upstreamIntel = findUpstreamIntel(normalized.raw, device.ips.length ? device.ips : [device.ip]);
 
   return (
     <div className="text-sm text-zinc-700 dark:text-zinc-300">
@@ -100,6 +216,8 @@ function DeviceDetails({ device, normalized }: { device: NetworkDevice; normaliz
         <ConfidenceBar value={device.confidence} />
       </Section>
 
+      {upstreamIntel && <UpstreamIntelSection intel={upstreamIntel} />}
+
       {discovery.length > 0 && (
         <Section title="Discovered via">
           <div className="flex flex-wrap gap-1">
@@ -118,9 +236,26 @@ function DeviceDetails({ device, normalized }: { device: NetworkDevice; normaliz
         <Row label="MAC address" value={device.mac ?? 'Unknown'} mono />
         <Row label="Vendor / OUI" value={device.vendor ?? 'Unknown'} />
         <Row label="Type" value={<span className="capitalize">{device.type.replace(/_/g, ' ')}</span>} />
+        <Row label="OS hint" value={device.osHint && device.osHint !== 'unknown' ? device.osHint : 'Unknown'} mono />
         <Row label="Roles" value={device.roles.length ? device.roles.join(', ') : 'Unknown'} />
         <Row label="Reachability" value={<span className="capitalize">{device.reachability}</span>} />
       </Section>
+
+      {device.mobileFingerprint && <MobileFingerprintSection fingerprint={device.mobileFingerprint} device={device} />}
+
+      {device.rawSources.length > 0 && (
+        <Section title="Raw sources">
+          <div className="flex flex-wrap gap-1">
+            {device.rawSources.map((source) => <Tag key={source}>{source}</Tag>)}
+          </div>
+        </Section>
+      )}
+
+      {device.wireless && (
+        <Section title="Wireless metadata">
+          <RawMini data={device.wireless} />
+        </Section>
+      )}
 
       {device.isUnknown && (
         <Section title="Why unknown">
@@ -196,8 +331,11 @@ function EdgeDetails({ edge, normalized }: { edge: TopologyEdge; normalized: Non
   const evidenceIds = (edge.evidenceIds as string[] | undefined) ?? [];
   const evidence = normalized.evidence.filter((e) => evidenceIds.includes(e.id));
   const reason = (edge.reason as string | null) ?? null;
+  const explanation = edge.explanation ?? reason;
   const proof = (edge.proofSource as string | null) ?? edge.basis;
   const confLabel = (edge.confidenceLabel as string | null) ?? null;
+  const embeddedEvidence = edge.evidence ?? [];
+  const warnings = edge.warnings ?? [];
 
   return (
     <div className="text-sm text-zinc-700 dark:text-zinc-300">
@@ -220,6 +358,7 @@ function EdgeDetails({ edge, normalized }: { edge: TopologyEdge; normalized: Non
       <Section title="Link">
         <Row label="Relationship" value={formatTopologyEdgeLabel(edge)} />
         <Row label="Layer" value={edge.tier.toUpperCase()} />
+        <Row label="Medium" value={edge.medium ?? edge.tier} />
         <Row label="Physical" value={edge.physical ? 'Yes (proven)' : 'No'} />
         <Row label="Inferred" value={edge.inferred ? 'Yes' : 'No'} />
         <Row label="Proof source" value={proof} mono />
@@ -229,9 +368,21 @@ function EdgeDetails({ edge, normalized }: { edge: TopologyEdge; normalized: Non
         <ConfidenceBar value={edge.confidence} />
       </Section>
 
-      {reason && (
-        <Section title="Why this link">
-          <p className="text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">{reason}</p>
+      {explanation && (
+        <Section title="Explanation">
+          <p className="text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">{explanation}</p>
+        </Section>
+      )}
+
+      {warnings.length > 0 && (
+        <Section title="Warnings">
+          <ul className="space-y-1 text-xs">
+            {warnings.map((warning, index) => (
+              <li key={index} className="rounded border border-amber-500/30 bg-amber-500/5 px-2 py-1 text-amber-700 dark:text-amber-300">
+                {warning}
+              </li>
+            ))}
+          </ul>
         </Section>
       )}
 
@@ -253,8 +404,160 @@ function EdgeDetails({ edge, normalized }: { edge: TopologyEdge; normalized: Non
         </Section>
       )}
 
+      {evidence.length === 0 && embeddedEvidence.length > 0 && (
+        <Section title={`Embedded evidence (${embeddedEvidence.length})`}>
+          <RawMini data={embeddedEvidence} />
+        </Section>
+      )}
+
       <RawAccordion data={edge.rawEdge as Record<string, unknown> ?? edge} />
     </div>
+  );
+}
+
+function fmtMs(v?: number): string {
+  return typeof v === 'number' ? `${v.toFixed(v < 10 ? 1 : 0)} ms` : '—';
+}
+
+/**
+ * Upstream-gateway enrichment panel (e.g. for 192.168.1.1). Shows the
+ * evidence-based identity, reachability, services, HTTP/TLS fingerprints,
+ * routing interpretation, weighted evidence, and any limitations. Weak/inferred
+ * results are visually distinct (amber) from confirmed reachability (emerald).
+ */
+function UpstreamIntelSection({ intel }: { intel: UpstreamIntel }) {
+  const headline = routingHeadline(intel);
+  const reach = intel.reachability;
+  const reachable = Boolean(reach?.icmp || reach?.tcpReachable);
+
+  return (
+    <div className="mt-5 rounded-lg border border-sky-500/25 bg-sky-500/[0.06] p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="font-mono text-[10px] uppercase tracking-wider text-sky-500">Upstream intelligence</span>
+        <span
+          className={[
+            'rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide',
+            reachable ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400',
+          ].join(' ')}
+        >
+          {reachable ? 'reachable' : 'inferred / unreachable'}
+        </span>
+      </div>
+
+      {headline && <div className="mb-2 text-[13px] font-semibold text-zinc-200">{headline}</div>}
+
+      {intel.tags.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1">
+          {intel.tags.map((t) => (
+            <Tag key={t} tone={reachable ? 'blue' : 'amber'}>{tagLabel(t)}</Tag>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-1">
+        <ConfidenceBar value={intel.confidence} />
+      </div>
+
+      {reach && (
+        <Section title="Reachability">
+          <Row label="ICMP ping" value={reach.icmp ? 'Reply' : 'No reply'} />
+          <Row label="TCP connect" value={reach.tcpReachable ? 'Open' : 'Closed/filtered'} />
+          <Row label="Latency (avg)" value={fmtMs(reach.avgLatencyMs)} mono />
+          {reach.minLatencyMs != null && <Row label="Latency (min/max)" value={`${fmtMs(reach.minLatencyMs)} / ${fmtMs(reach.maxLatencyMs)}`} mono />}
+          {reach.ttl != null && <Row label="TTL" value={String(reach.ttl)} mono />}
+          {reach.packetLoss != null && <Row label="Packet loss" value={`${reach.packetLoss}%`} mono />}
+          {reach.hopDistance != null && <Row label="Hop distance" value={String(reach.hopDistance)} mono />}
+          <Row label="Directly reachable" value={reach.directlyReachable ? 'Yes (same subnet)' : 'No (routed via gateway)'} />
+          <Row label="Method" value={reach.method} mono />
+        </Section>
+      )}
+
+      {intel.vendor && (
+        <Section title="Vendor hint">
+          <Row label="Fingerprint" value={intel.vendor} />
+        </Section>
+      )}
+
+      {intel.services.length > 0 && (
+        <Section title={`Services (${intel.services.length})`}>
+          <div className="flex flex-wrap gap-1">
+            {intel.services.map((s) => (
+              <Tag key={`${s.protocol}-${s.port}`} tone="green">{(s.name ? `${s.name} ` : '') + (s.port || '')}</Tag>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {intel.http.length > 0 && (
+        <Section title="HTTP / HTTPS">
+          {intel.http.map((h, i) => (
+            <div key={i} className="border-b border-zinc-800 py-1 text-[12px] last:border-b-0">
+              <div className="flex justify-between gap-2">
+                <span className="text-zinc-500">Status</span>
+                <span className="font-mono">{h.statusCode ?? '—'}</span>
+              </div>
+              {h.server && <div className="flex justify-between gap-2"><span className="text-zinc-500">Server</span><span className="truncate font-mono text-[11px]">{h.server}</span></div>}
+              {h.title && <div className="flex justify-between gap-2"><span className="text-zinc-500">Title</span><span className="truncate text-right">{h.title}</span></div>}
+              {h.wwwAuthenticate && <div className="flex justify-between gap-2"><span className="text-zinc-500">Auth</span><span className="truncate font-mono text-[11px]">{h.wwwAuthenticate}</span></div>}
+            </div>
+          ))}
+        </Section>
+      )}
+
+      {intel.tls.length > 0 && (
+        <Section title="TLS certificate">
+          {intel.tls.map((t, i) => (
+            <div key={i} className="text-[12px]">
+              {t.cn && <Row label="Subject CN" value={t.cn} mono />}
+              {t.issuer && <Row label="Issuer" value={t.issuer} mono />}
+              {t.sans && t.sans.length > 0 && <Row label="SANs" value={t.sans.join(', ')} mono />}
+            </div>
+          ))}
+        </Section>
+      )}
+
+      {intel.routing && (
+        <Section title="Routing evidence">
+          <Row label="Kind" value={<span className="capitalize">{intel.routing.kind.replace(/_/g, ' ')}</span>} />
+          <Row label="Double NAT" value={intel.routing.doubleNat ? 'Likely' : 'No'} />
+          <Row label="Same subnet" value={intel.routing.sameSubnetAsAgent ? 'Yes' : 'No'} />
+          {intel.routing.notes.map((n, i) => (
+            <p key={i} className="mt-1 text-[11px] leading-relaxed text-zinc-500">{n}</p>
+          ))}
+        </Section>
+      )}
+
+      {intel.evidence.length > 0 && (
+        <Section title={`Classification evidence (${intel.evidence.length})`}>
+          <ul className="space-y-1 text-[11px]">
+            {intel.evidence.map((e, i) => (
+              <li key={i} className="flex items-center justify-between gap-2 rounded bg-zinc-800/50 px-2 py-1">
+                <span className="truncate"><span className="font-mono text-[10px] text-zinc-500">{e.source}</span> · {e.type.replace(/_/g, ' ')}</span>
+                <span className="shrink-0 font-mono text-emerald-400">+{Math.round(e.confidenceImpact * 100)}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {intel.warnings.length > 0 && (
+        <Section title="Limitations">
+          <ul className="space-y-1 text-[11px]">
+            {intel.warnings.map((w, i) => (
+              <li key={i} className="rounded border border-amber-500/30 bg-amber-500/5 px-2 py-1 text-amber-300">{w}</li>
+            ))}
+          </ul>
+        </Section>
+      )}
+    </div>
+  );
+}
+
+function RawMini({ data }: { data: unknown }) {
+  return (
+    <pre className="max-h-44 overflow-auto rounded-md border border-zinc-200 bg-zinc-950 p-2 font-mono text-[10px] leading-relaxed text-zinc-300 dark:border-zinc-800">
+      {JSON.stringify(data, null, 2)}
+    </pre>
   );
 }
 

@@ -126,6 +126,49 @@ func ValidateReport(r models.ScanReport) []string {
 		checkEvidence(add, "edge "+e.ID, e.EvidenceIDs, evidenceIDs)
 	}
 
+	if r.Topology != nil {
+		if r.Topology.SchemaVersion != models.TopologyReportSchema {
+			add("topology.schema_version %q is not the expected %q", r.Topology.SchemaVersion, models.TopologyReportSchema)
+		}
+		v2NodeIDs := map[string]bool{}
+		for i, n := range r.Topology.Nodes {
+			if n.ID == "" {
+				add("topology.nodes[%d] has an empty id", i)
+				continue
+			}
+			if v2NodeIDs[n.ID] {
+				add("duplicate topology node id %q", n.ID)
+			}
+			v2NodeIDs[n.ID] = true
+			if n.Confidence < 0 || n.Confidence > 1 {
+				add("topology node %q confidence %.3f out of range [0,1]", n.ID, n.Confidence)
+			}
+		}
+		for i, e := range r.Topology.Edges {
+			if e.ID == "" {
+				add("topology.edges[%d] has an empty id", i)
+			}
+			if e.Source == "" || e.Target == "" {
+				add("topology edge %q has empty endpoint", e.ID)
+			}
+			if !v2NodeIDs[e.Source] {
+				add("topology edge %q references unknown source node %q", e.ID, e.Source)
+			}
+			if !v2NodeIDs[e.Target] {
+				add("topology edge %q references unknown target node %q", e.ID, e.Target)
+			}
+			if e.Type == "" || e.Relation == "" || e.Medium == "" {
+				add("topology edge %q missing type/relation/medium", e.ID)
+			}
+			if e.Explanation == "" {
+				add("topology edge %q has no explanation", e.ID)
+			}
+			if e.Confidence < 0 || e.Confidence > 1 {
+				add("topology edge %q confidence %.3f out of range [0,1]", e.ID, e.Confidence)
+			}
+		}
+	}
+
 	// Summary counts must match the body.
 	if r.Summary.DeviceCount != len(r.Devices) {
 		add("summary.device_count %d != %d devices", r.Summary.DeviceCount, len(r.Devices))

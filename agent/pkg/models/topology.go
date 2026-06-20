@@ -10,7 +10,7 @@ import "time"
 
 // TopologyReportSchema is the schema identifier embedded in every ScanReport so
 // consumers can detect the format/version.
-const TopologyReportSchema = "iad.topology/v1"
+const TopologyReportSchema = "iad.topology/v2"
 
 // Edge types. An edge is only as trustworthy as the evidence behind it, so the
 // type records *how* the link was established. Physical adjacency (LLDP/CDP/SNMP)
@@ -75,9 +75,25 @@ type ScanReport struct {
 	Privacy            PrivacyOptions                `json:"privacy,omitempty"`
 	SafeToShare        SafeShareReport               `json:"safe_to_share,omitempty"`
 	UI                 ReportUI                      `json:"ui,omitempty"`
+	// Topology is the v2 frontend-ready graph contract. It embeds nodes, edges,
+	// evidence, warnings, and UI hints while preserving the legacy /devices and
+	// /edges arrays for older consumers.
+	Topology *TopologyV2Model `json:"topology,omitempty"`
+	// Wireless carries optional metadata-only Wi-Fi observations when the OS,
+	// adapter, driver, and permissions support it. Unsupported collectors report
+	// a capability warning instead of failing the scan.
+	Wireless []WirelessMetadata `json:"wireless,omitempty"`
+	// RawObservations contains sanitized metadata-only observations. It must not
+	// contain packet payloads, cookies, credentials, tokens, or private traffic
+	// content.
+	RawObservations []RawObservation `json:"raw_observations,omitempty"`
 	// DeviceIntel carries the richer UI/inventory view derived from the same
 	// evidence-backed topology facts plus optional access/modem context.
 	DeviceIntel *DeviceIntelReport `json:"device_intel,omitempty"`
+	// RichTopology is a frontend-ready evidence graph that combines the root
+	// topology, device intelligence, passive observations, and wireless metadata
+	// when available. It is additive; /devices and /edges remain stable.
+	RichTopology *RichTopologyModel `json:"rich_topology,omitempty"`
 	// AccessClassification optionally carries the access-type verdict from the
 	// existing detection engine, when the user runs scan with classification on.
 	AccessClassification *ScanResult `json:"access_classification,omitempty"`
@@ -90,6 +106,66 @@ type ReportCapability struct {
 	OutputPath  string `json:"output_path,omitempty"`
 	Description string `json:"description,omitempty"`
 	Reason      string `json:"reason,omitempty"`
+}
+
+type TopologyV2Model struct {
+	SchemaVersion string             `json:"schema_version"`
+	GeneratedAt   time.Time          `json:"generated_at"`
+	RootID        string             `json:"root_id,omitempty"`
+	Nodes         []RichTopologyNode `json:"nodes"`
+	Edges         []TopologyV2Edge   `json:"edges"`
+	Warnings      []Warning          `json:"warnings,omitempty"`
+	Capabilities  []ReportCapability `json:"capabilities,omitempty"`
+	UI            RichTopologyUI     `json:"ui"`
+}
+
+type TopologyV2Edge struct {
+	ID          string         `json:"id"`
+	Source      string         `json:"source"`
+	Target      string         `json:"target"`
+	Type        string         `json:"type"`
+	Relation    string         `json:"relation"`
+	Medium      string         `json:"medium"`
+	Confidence  float64        `json:"confidence"`
+	Evidence    []RichEvidence `json:"evidence,omitempty"`
+	Explanation string         `json:"explanation,omitempty"`
+	Warnings    []string       `json:"warnings,omitempty"`
+	FirstSeen   time.Time      `json:"first_seen,omitempty"`
+	LastSeen    time.Time      `json:"last_seen,omitempty"`
+	UI          map[string]any `json:"ui,omitempty"`
+}
+
+type WirelessMetadata struct {
+	SSID             string    `json:"ssid,omitempty"`
+	BSSID            string    `json:"bssid,omitempty"`
+	Channel          int       `json:"channel,omitempty"`
+	Frequency        int       `json:"frequency,omitempty"`
+	Band             string    `json:"band,omitempty"`
+	RSSI             int       `json:"rssi,omitempty"`
+	Security         string    `json:"security,omitempty"`
+	APMAC            string    `json:"ap_mac,omitempty"`
+	StationMAC       string    `json:"station_mac,omitempty"`
+	FirstSeen        time.Time `json:"first_seen,omitempty"`
+	LastSeen         time.Time `json:"last_seen,omitempty"`
+	ObservationCount int       `json:"observation_count,omitempty"`
+	Confidence       float64   `json:"confidence,omitempty"`
+	Source           string    `json:"source,omitempty"`
+}
+
+type RawObservation struct {
+	Source         string         `json:"source"`
+	Kind           string         `json:"kind"`
+	Interface      string         `json:"interface,omitempty"`
+	SourceMAC      string         `json:"source_mac,omitempty"`
+	DestinationMAC string         `json:"destination_mac,omitempty"`
+	SourceIP       string         `json:"source_ip,omitempty"`
+	DestinationIP  string         `json:"destination_ip,omitempty"`
+	Protocol       string         `json:"protocol,omitempty"`
+	EtherType      string         `json:"ether_type,omitempty"`
+	FirstSeen      time.Time      `json:"first_seen,omitempty"`
+	LastSeen       time.Time      `json:"last_seen,omitempty"`
+	Count          int            `json:"count,omitempty"`
+	Metadata       map[string]any `json:"metadata,omitempty"`
 }
 
 type EvidenceRegistryItem struct {
@@ -197,12 +273,13 @@ type UIGraphEdge struct {
 
 // AgentInfo describes the host running the scan.
 type AgentInfo struct {
-	Version    string          `json:"version"`
-	Hostname   string          `json:"hostname,omitempty"`
-	OS         string          `json:"os,omitempty"`
-	Gateway    string          `json:"gateway,omitempty"`
-	DNSServers []string        `json:"dns_servers,omitempty"`
-	Interfaces []InterfaceInfo `json:"interfaces,omitempty"`
+	Version      string             `json:"version"`
+	Hostname     string             `json:"hostname,omitempty"`
+	OS           string             `json:"os,omitempty"`
+	Gateway      string             `json:"gateway,omitempty"`
+	DNSServers   []string           `json:"dns_servers,omitempty"`
+	Interfaces   []InterfaceInfo    `json:"interfaces,omitempty"`
+	Capabilities []ReportCapability `json:"capabilities,omitempty"`
 }
 
 // InterfaceInfo is one local network interface and how it was classified.
@@ -236,18 +313,22 @@ type ScanScope struct {
 // Device is a normalized host discovered on the network. Every non-trivial field
 // is traceable to one or more Evidence records via EvidenceIDs.
 type Device struct {
-	ID         string            `json:"id"`
-	Hostname   string            `json:"hostname,omitempty"`
-	Hostnames  []string          `json:"hostnames,omitempty"`
-	Vendor     string            `json:"vendor,omitempty"`
-	MAC        string            `json:"mac,omitempty"`
-	OUIVendor  string            `json:"oui_vendor,omitempty"`
-	Roles      []string          `json:"roles,omitempty"`
-	IsAgent    bool              `json:"is_agent,omitempty"`
-	IsGateway  bool              `json:"is_gateway,omitempty"`
-	Addresses  []IPAddress       `json:"addresses"`
-	Interfaces []DeviceInterface `json:"interfaces,omitempty"`
-	Services   []Service         `json:"services,omitempty"`
+	ID                string             `json:"id"`
+	Hostname          string             `json:"hostname,omitempty"`
+	Hostnames         []string           `json:"hostnames,omitempty"`
+	Vendor            string             `json:"vendor,omitempty"`
+	MAC               string             `json:"mac,omitempty"`
+	OUIVendor         string             `json:"oui_vendor,omitempty"`
+	MobileFingerprint *MobileFingerprint `json:"mobileFingerprint,omitempty"`
+	DeviceTypeHint    string             `json:"deviceTypeHint,omitempty"`
+	OSHint            string             `json:"osHint,omitempty"`
+	OSConfidence      float64            `json:"osConfidence,omitempty"`
+	Roles             []string           `json:"roles,omitempty"`
+	IsAgent           bool               `json:"is_agent,omitempty"`
+	IsGateway         bool               `json:"is_gateway,omitempty"`
+	Addresses         []IPAddress        `json:"addresses"`
+	Interfaces        []DeviceInterface  `json:"interfaces,omitempty"`
+	Services          []Service          `json:"services,omitempty"`
 	// Reachability summarizes how the device answered: self | reachable |
 	// arp_only | unknown. arp_only means it answered ARP (is on the LAN) but had
 	// no open probed port / ICMP reply — it must still appear on the map.

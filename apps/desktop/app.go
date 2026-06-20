@@ -9,7 +9,10 @@ import (
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
+	"sync"
 	"time"
+
+	"iad-console/ippool"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -25,6 +28,17 @@ import (
 //     run as a child process when present.
 type App struct {
 	ctx context.Context
+
+	// Scan lifecycle state. A single managed scan can be in flight at a time.
+	// scanMu guards all three fields. The scan itself runs on its own goroutine
+	// (see scan_controller.go), so Wails' UI thread is never blocked.
+	scanMu     sync.Mutex
+	scanCancel context.CancelFunc // cancels the in-flight scan; nil when idle
+	scanID     string             // id of the in-flight scan; "" when idle
+	lastReport string             // raw JSON of the most recent successful scan
+
+	poolMu sync.Mutex
+	ipPool *ippool.Manager
 }
 
 func NewApp() *App { return &App{} }
@@ -83,16 +97,24 @@ func (a *App) ListInterfaces() (string, error) {
 	return out, nil
 }
 
+// maxScanTimeout is the iad-agent's overall scan budget. The console always runs
+// the deepest scan, so this is sized to let a full /24 ARP + TCP + Nmap sweep
+// complete and surface every reachable device rather than time out early.
+const maxScanTimeout = 180 * time.Second
+
 // RunScan invokes the EXTERNAL iad-agent binary (the preserved Go scanner) and
 // returns its raw JSON stdout. This is a passthrough — the console never
-// reimplements detection. mode selects the scan profile; iface (optional) pins
-// the scan to a specific network interface chosen on the launch screen.
+// reimplements detection. There is no scan-profile selection: every scan runs at
+// maximum capability. mode is ignored; iface (optional) pins the scan to a
+// specific network interface chosen on the launch screen.
 func (a *App) RunScan(mode string, iface string) (string, error) {
 	args, err := agentScanArgs(mode, iface)
 	if err != nil {
 		return "", err
 	}
-	return a.runAgent(4*time.Minute, args...)
+	// Allow comfortably more than the agent's own budget so we capture its full
+	// output instead of killing it at the wire.
+	return a.runAgent(maxScanTimeout+60*time.Second, args...)
 }
 
 // runAgent locates and executes the bundled iad-agent with the given args,
@@ -161,23 +183,19 @@ func (a *App) resolveAgentBin() (string, error) {
 	return "", fmt.Errorf("iad-agent binary not found: place %s next to the app, set IAD_AGENT_BIN, or add it to PATH; otherwise use Import instead", name)
 }
 
-func agentScanArgs(mode string, iface string) ([]string, error) {
-	mode = strings.TrimSpace(strings.ToLower(mode))
-	if mode == "" {
-		mode = "standard"
-	}
-
-	var args []string
-	switch mode {
-	case "full":
-		args = []string{"scan", "--full"}
-	case "quick", "standard", "deep":
-		args = []string{"scan", "--cidr", "auto", "--profile", mode}
-		if mode != "quick" {
-			args = append(args, "--classify")
-		}
-	default:
-		return nil, fmt.Errorf("invalid scan mode %q (use quick, standard, deep, or full)", mode)
+// agentScanArgs builds the iad-agent invocation. The console has no scan-profile
+// selection — every run scans at maximum capability — so mode is ignored and we
+// always use --full (deep profile + access classification + all report sections)
+// with Nmap service discovery, across the whole interface subnet (--cidr auto),
+// and a long --timeout so the full ARP + TCP + Nmap sweep can finish and surface
+// every reachable device.
+func agentScanArgs(_ string, iface string) ([]string, error) {
+	args := []string{
+		"scan",
+		"--full",
+		"--cidr", "auto",
+		"--nmap",
+		"--timeout", maxScanTimeout.String(),
 	}
 
 	// Pin the scan to the interface chosen on the launch screen (Wireshark-style).

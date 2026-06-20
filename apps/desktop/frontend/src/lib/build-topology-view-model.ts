@@ -22,6 +22,16 @@ import { deviceDisplayTitle, deviceSecondaryHostname } from './topology-display'
 const COL = { lan: 150, spine: 430, branch: 700 };
 const ROW = 118;
 
+function deviceBadge(d: NetworkDevice): string | null {
+  if (d.isGateway) return 'Gateway';
+  if (d.isAgent) return 'Local';
+  if (d.roles.some((role) => role.toLowerCase() === 'upstream_private_gateway' || role.toLowerCase() === 'possible_cpe')) {
+    return 'Upstream';
+  }
+  if (d.isUnknown) return 'Unknown';
+  return null;
+}
+
 function deviceNode(d: NetworkDevice, index: number): TopologyNode {
   return {
     id: d.id,
@@ -30,7 +40,7 @@ function deviceNode(d: NetworkDevice, index: number): TopologyNode {
     sublabel: d.ip,
     certainty: 'confirmed',
     layers: ['l2', 'l3'],
-    badge: d.isGateway ? 'Gateway' : d.isAgent ? 'Local' : d.isUnknown ? 'Unknown' : null,
+    badge: deviceBadge(d),
     deviceId: d.id,
     accent: d.isGateway || d.isAgent,
     position: {
@@ -46,6 +56,11 @@ function deviceNode(d: NetworkDevice, index: number): TopologyNode {
     hostname: deviceSecondaryHostname(d),
     reachability: d.reachability,
     discoverySources: d.discoverySources,
+    mobileFingerprint: d.mobileFingerprint,
+    deviceTypeHint: d.deviceTypeHint,
+    osHint: d.osHint,
+    osConfidence: d.osConfidence,
+    osEvidenceSummary: d.osEvidenceSummary,
   } as TopologyNode;
 }
 
@@ -214,6 +229,11 @@ function synthesize(scan: NormalizedScanReport): TopologyViewModel {
     isUnknown: false,
     ip: host?.ip ?? null,
     hostname: host ? deviceSecondaryHostname(host) : null,
+    mobileFingerprint: host?.mobileFingerprint ?? null,
+    deviceTypeHint: host?.deviceTypeHint ?? null,
+    osHint: host?.osHint ?? null,
+    osConfidence: host?.osConfidence ?? null,
+    osEvidenceSummary: host?.osEvidenceSummary ?? [],
   } as TopologyNode);
 
   // Gateway chain spine (down the middle). First hop is the LAN gateway.
@@ -282,9 +302,11 @@ function synthesize(scan: NormalizedScanReport): TopologyViewModel {
     nodes.push({
       id, type: d.type, label: deviceDisplayTitle(d), sublabel: d.ip,
       certainty: 'confirmed', layers: ['l2', 'l3'],
-      badge: d.isUnknown ? 'Unknown' : null, deviceId: d.id, accent: d.isAgent || d.isGateway, position: { x: col, y: row },
+      badge: deviceBadge(d), deviceId: d.id, accent: d.isAgent || d.isGateway, position: { x: col, y: row },
       isGateway: d.isGateway, isAgent: d.isAgent, isUnknown: d.isUnknown, ip: d.ip, hostname: deviceSecondaryHostname(d),
       reachability: d.reachability, discoverySources: d.discoverySources, confidence: d.confidence, roles: d.roles,
+      mobileFingerprint: d.mobileFingerprint, deviceTypeHint: d.deviceTypeHint, osHint: d.osHint, osConfidence: d.osConfidence,
+      osEvidenceSummary: d.osEvidenceSummary,
     } as TopologyNode);
     edges.push({
       id: `e-router-${id}`, source: routerId, target: id, type: e.type,

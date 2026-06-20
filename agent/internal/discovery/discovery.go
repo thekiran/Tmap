@@ -142,6 +142,7 @@ func Run(ctx context.Context, opts Options) (models.ScanReport, error) {
 	}
 
 	evidence := store.Records()
+	build.Devices = ApplyMobileFingerprints(build.Devices, evidence, now())
 	report := models.ScanReport{
 		SchemaVersion: models.TopologyReportSchema,
 		ScanID:        "topo_" + start.Format("20060102_150405"),
@@ -439,7 +440,16 @@ func (opts Options) sweeper() Sweeper {
 	if opts.Sweeper != nil {
 		return opts.Sweeper
 	}
-	return TCPSweeper{Profile: opts.Profile}
+	// Scale concurrency with scan depth so the deepest scans can still sweep a
+	// full /24 (and its wider port set) within the time budget.
+	conc := 64
+	switch opts.Profile {
+	case "deep", "full":
+		conc = 256
+	case "normal", "standard":
+		conc = 128
+	}
+	return TCPSweeper{Profile: opts.Profile, Concurrency: conc}
 }
 
 func (opts Options) arpReader() ARPReader {

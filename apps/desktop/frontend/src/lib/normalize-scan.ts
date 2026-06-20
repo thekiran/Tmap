@@ -6,6 +6,9 @@ import type {
   DeviceService,
   EvidenceRecord,
   GatewayHop,
+  MobileConflictItem,
+  MobileEvidenceItem,
+  MobileFingerprint,
   NetworkDevice,
   NormalizedScanReport,
   OpenService,
@@ -48,12 +51,14 @@ function addressIps(device: RawDevice, intel: Record<string, unknown>): string[]
 function macFor(device: RawDevice, intel: Record<string, unknown>): string | null {
   const interfaceMac = arr<Record<string, unknown>>(device.interfaces).map((item) => str(item.mac)).find(Boolean);
   const intelInterfaces = arr<Record<string, unknown>>(intel.interfaces).map((item) => str(item.mac)).find(Boolean);
-  return str(device.mac) ?? interfaceMac ?? intelInterfaces ?? null;
+  const intelMac = arr<string>(intel.mac_addresses)[0];
+  return str(device.mac) ?? interfaceMac ?? intelInterfaces ?? intelMac ?? null;
 }
 
 function vendorFor(device: RawDevice, intel: Record<string, unknown>): string | null {
   if (typeof device.vendor === 'string') return device.vendor;
   if (device.oui_vendor) return device.oui_vendor;
+  if (typeof intel.vendor === 'string') return intel.vendor;
   const vendor = rec(device.vendor);
   const intelVendor = rec(intel.vendor);
   return (
@@ -65,22 +70,116 @@ function vendorFor(device: RawDevice, intel: Record<string, unknown>): string | 
 }
 
 function hostnameFor(device: RawDevice, intel: Record<string, unknown>): string | null {
-  return str(device.hostname) ?? str(device.name) ?? arr<string>(device.hostnames)[0] ?? arr<string>(intel.hostnames)[0] ?? null;
+  return str(device.hostname) ?? str(device.name) ?? str(intel.hostname) ?? arr<string>(device.hostnames)[0] ?? arr<string>(intel.hostnames)[0] ?? null;
 }
 
 function mapNodeType(value: string | null, roles: string[]): NetworkDevice['type'] {
   const lower = (value ?? '').toLowerCase();
   const roleSet = new Set(roles.map((role) => role.toLowerCase()));
-  if (roleSet.has('gateway') || lower.includes('gateway') || lower.includes('router')) return 'router';
+  if (roleSet.has('possible_cpe') || roleSet.has('upstream_private_gateway') || lower.includes('cpe')) return 'modem_cpe';
+  if (roleSet.has('gateway') || lower === 'gateway' || lower.includes('gateway_router')) return 'gateway';
+  if (roleSet.has('router') || lower.includes('router')) return 'router';
   if (roleSet.has('agent')) return 'local_host';
+  if (roleSet.has('mesh_node') || lower.includes('mesh')) return 'mesh_node';
+  if (roleSet.has('repeater') || lower.includes('repeater') || lower.includes('extender')) return 'repeater';
+  if (roleSet.has('wireless_client') || lower.includes('wireless_client') || lower.includes('wifi_client')) return 'wireless_client';
+  if (roleSet.has('wired_client') || lower.includes('wired_client')) return 'wired_client';
   if (lower.includes('windows') || lower.includes('pc') || lower.includes('workstation')) return 'workstation';
   if (lower.includes('server')) return 'server';
   if (lower.includes('printer')) return 'printer';
-  if (lower.includes('mobile') || lower.includes('phone')) return 'mobile';
-  if (lower.includes('switch')) return 'managed_switch';
+  if (lower.includes('phone') || lower.includes('iphone')) return 'phone';
+  if (lower.includes('android') || lower.includes('ios') || lower.includes('ipados') || lower.includes('mobile') || lower.includes('apple_device')) return 'mobile';
+  if (lower.includes('mobile')) return 'mobile';
+  if (lower.includes('iot')) return 'iot';
+  if (roleSet.has('switch') || lower.includes('switch')) return 'managed_switch';
   if (lower.includes('access_point') || lower.includes('wifi')) return 'access_point';
   if (lower.includes('unknown')) return 'unknown';
-  return 'host';
+  if (!lower && roleSet.has('host')) return 'host';
+  return 'unknown';
+}
+
+function normalizeMobileEvidence(value: unknown): MobileEvidenceItem[] {
+  return arr<Record<string, unknown>>(value).map((item, index) => ({
+    id: str(item.id) ?? `mobile-evidence-${index}`,
+    type: str(item.type) ?? 'unknown',
+    value: str(item.value) ?? '',
+    osHint: normalizeOSHint(item.osHint ?? item.os_hint),
+    confidenceImpact: num(item.confidenceImpact ?? item.confidence_impact) ?? 0,
+    strength: normalizeEvidenceStrength(item.strength),
+    source: str(item.source) ?? 'mobile_fingerprint',
+    timestamp: str(item.timestamp) ?? '',
+    explanation: str(item.explanation) ?? '',
+  }));
+}
+
+function normalizeMobileConflicts(value: unknown): MobileConflictItem[] {
+  return arr<Record<string, unknown>>(value).map((item) => ({
+    reason: str(item.reason) ?? 'Conflicting mobile OS evidence.',
+    iosEvidenceIds: arr<string>(item.iosEvidenceIds ?? item.ios_evidence_ids),
+    androidEvidenceIds: arr<string>(item.androidEvidenceIds ?? item.android_evidence_ids),
+    severity: str(item.severity) === 'info' ? 'info' : 'warning',
+    resolutionHint: str(item.resolutionHint ?? item.resolution_hint) ?? '',
+  }));
+}
+
+function normalizeEvidenceStrength(value: unknown): MobileEvidenceItem['strength'] {
+  const lower = String(value ?? '').toLowerCase();
+  if (lower === 'strong' || lower === 'medium' || lower === 'weak') return lower;
+  return 'weak';
+}
+
+function normalizeOSHint(value: unknown): NonNullable<NetworkDevice['osHint']> {
+  const lower = String(value ?? '').toLowerCase();
+  if (lower === 'ios' || lower === 'ipados' || lower === 'android') return lower;
+  return 'unknown';
+}
+
+function normalizeDeviceTypeHint(value: unknown): NonNullable<NetworkDevice['deviceTypeHint']> {
+  const lower = String(value ?? '').toLowerCase();
+  if (lower === 'phone' || lower === 'tablet' || lower === 'computer' || lower === 'iot' || lower === 'router') return lower;
+  return 'unknown';
+}
+
+function normalizeMobileFingerprint(value: unknown): MobileFingerprint | null {
+  const raw = rec(value);
+  if (Object.keys(raw).length === 0) return null;
+  return {
+    classification: str(raw.classification) ?? 'unknown_device',
+    iosScore: num(raw.iosScore ?? raw.ios_score) ?? 0,
+    androidScore: num(raw.androidScore ?? raw.android_score) ?? 0,
+    ipadScore: num(raw.ipadScore ?? raw.ipad_score) ?? 0,
+    confidence: clamp01(raw.confidence, 0),
+    evidence: normalizeMobileEvidence(raw.evidence),
+    conflicts: normalizeMobileConflicts(raw.conflicts),
+    warnings: arr<string>(raw.warnings),
+    lastUpdatedAt: str(raw.lastUpdatedAt ?? raw.last_updated_at),
+    whyThisClassification: str(raw.whyThisClassification ?? raw.why_this_classification),
+    whyNotCertain: str(raw.whyNotCertain ?? raw.why_not_certain),
+  };
+}
+
+function osHintFromClassification(classification: string | undefined): NonNullable<NetworkDevice['osHint']> {
+  if (!classification) return 'unknown';
+  if (classification.includes('ipados')) return 'ipados';
+  if (classification.includes('ios')) return 'ios';
+  if (classification.includes('android')) return 'android';
+  return 'unknown';
+}
+
+function roleSetFor(roles: string[]): Set<string> {
+  return new Set(roles.map((role) => role.toLowerCase()));
+}
+
+function hasDefaultGatewayRole(roles: string[]): boolean {
+  const roleSet = roleSetFor(roles);
+  return roleSet.has('gateway') || roleSet.has('router');
+}
+
+function hasSpecificIdentityRole(roles: string[]): boolean {
+  return roles.some((role) => {
+    const lower = role.toLowerCase();
+    return lower !== 'host' && lower !== 'unknown_host';
+  });
 }
 
 function reachabilityFor(device: RawDevice, roles: string[]): NetworkDevice['reachability'] {
@@ -127,6 +226,10 @@ function normalizeRiskFindings(deviceId: string, deviceLabel: string, posture: R
 function normalizeDevices(raw: RawScanReport): NetworkDevice[] {
   const rootDevices = raw.devices ?? [];
   const intelDevices = arr<Record<string, unknown>>(rec(raw.device_intel).devices);
+  const richNodes = [
+    ...arr<Record<string, unknown>>(rec(raw.topology).nodes),
+    ...arr<Record<string, unknown>>(rec(raw.rich_topology).nodes),
+  ];
   const byId = new Map<string, { root?: RawDevice; intel?: Record<string, unknown> }>();
 
   for (const device of rootDevices) {
@@ -137,21 +240,40 @@ function normalizeDevices(raw: RawScanReport): NetworkDevice[] {
     const id = str(intel.id) ?? arr<string>(intel.ip_addresses)[0] ?? `intel-${byId.size + 1}`;
     byId.set(id, { ...(byId.get(id) ?? {}), intel });
   }
+  for (const rich of richNodes) {
+    const id = str(rich.id) ?? arr<string>(rich.ip_addresses)[0] ?? `rich-${byId.size + 1}`;
+    const roles = uniq([str(rich.device_role), ...arr<string>(rich.roles)]);
+    byId.set(id, { ...(byId.get(id) ?? {}), intel: { ...(byId.get(id)?.intel ?? {}), ...rich, roles } });
+  }
 
   return Array.from(byId.entries()).map(([id, parts]) => {
     const root = parts.root ?? ({ id } as RawDevice);
     const intel = parts.intel ?? {};
     const ips = addressIps(root, intel);
     const primaryIp = ips[0] ?? id;
-    const roles = uniq([...(root.roles ?? []), ...arr<string>(intel.roles), root.role]);
+    const roles = uniq([...(root.roles ?? []), ...arr<string>(intel.roles), root.role, str(intel.device_role)]);
     const deviceType = rec(intel.device_type);
-    const primaryType = str(deviceType.primary) ?? str(root.type);
-    const type = mapNodeType(primaryType, roles);
-    const isGateway = bool(root.is_gateway) || bool(rec(intel.topology).is_gateway) || roles.some((role) => /gateway|router/.test(role));
+    const isGateway = bool(root.is_gateway) || bool(rec(intel.topology).is_gateway) || hasDefaultGatewayRole(roles);
     const isAgent = bool(root.is_agent) || bool(rec(intel.topology).is_agent) || roles.includes('agent');
     const hostname = hostnameFor(root, intel);
     const mac = macFor(root, intel);
     const vendor = vendorFor(root, intel);
+    const mobileFingerprint = normalizeMobileFingerprint(
+      intel.mobileFingerprint ?? intel.mobile_fingerprint ?? root.mobileFingerprint ?? root.mobile_fingerprint,
+    );
+    const rawOSHint = intel.osHint ?? intel.os_hint ?? root.osHint ?? root.os_hint;
+    const osHint = rawOSHint == null ? osHintFromClassification(mobileFingerprint?.classification) : normalizeOSHint(rawOSHint);
+    const rawDeviceTypeHint = intel.deviceTypeHint ?? intel.device_type_hint ?? root.deviceTypeHint ?? root.device_type_hint;
+    const deviceTypeHint = rawDeviceTypeHint == null ? null : normalizeDeviceTypeHint(rawDeviceTypeHint);
+    const osConfidence = num(intel.osConfidence ?? intel.os_confidence ?? root.osConfidence ?? root.os_confidence) ?? mobileFingerprint?.confidence ?? null;
+    const osEvidenceSummary = arr<string>(intel.osEvidenceSummary ?? intel.os_evidence_summary ?? root.osEvidenceSummary ?? root.os_evidence_summary);
+    const primaryType =
+      str(deviceType.primary) ??
+      str(root.type) ??
+      str(intel.type) ??
+      (deviceTypeHint && deviceTypeHint !== 'unknown' ? deviceTypeHint : null) ??
+      (osHint !== 'unknown' ? osHint : null);
+    const type = mapNodeType(primaryType, roles);
     const label = hostname ?? primaryIp;
     const services = normalizeServices(id, label, intel.services ?? root.services);
     const riskPosture = rec(intel.security_posture);
@@ -161,7 +283,8 @@ function normalizeDevices(raw: RawScanReport): NetworkDevice[] {
       type === 'unknown' ||
       roles.some((role) => role.toLowerCase().includes('unknown')) ||
       String(primaryType ?? '').toLowerCase().includes('unknown');
-    const weakIdentity = !isGateway && !isAgent && !hostname && !vendor && services.length === 0;
+    const hasMobileIdentity = Boolean(mobileFingerprint && !['unknown_device', 'unknown_mobile'].includes(mobileFingerprint.classification));
+    const weakIdentity = !isGateway && !isAgent && !hasSpecificIdentityRole(roles) && !hostname && !vendor && services.length === 0 && !hasMobileIdentity;
     const isUnknown = explicitlyUnknown || weakIdentity;
 
     return {
@@ -185,8 +308,16 @@ function normalizeDevices(raw: RawScanReport): NetworkDevice[] {
       explanation: str(rec(deviceType.candidates)?.supporting_facts),
       limitations: arr<string>(deviceType.missing_evidence).join(' ') || null,
       rawProbeRefs: uniq([...(root.evidence_ids ?? []), ...arr<string>(intel.evidence_ids)]),
+      evidenceCount: arr<Record<string, unknown>>(intel.evidence).length || uniq([...(root.evidence_ids ?? []), ...arr<string>(intel.evidence_ids)]).length,
+      rawSources: arr<string>(intel.raw_sources),
+      wireless: Object.keys(rec(intel.wireless)).length ? rec(intel.wireless) : null,
       riskLevel: str(riskPosture.risk_level),
       riskFindings,
+      mobileFingerprint,
+      deviceTypeHint,
+      osHint,
+      osConfidence,
+      osEvidenceSummary,
       raw: { ...root, ...intel },
     };
   });
@@ -380,10 +511,18 @@ function edgeType(value: string | null): TopologyEdge['type'] {
     wifi_link: 'wifi_association_inferred',
     wifi_association_unknown: 'wifi_association_inferred',
     wifi_association_inferred: 'wifi_association_inferred',
+    'wireless-associated': 'wifi_association_inferred',
+    'wireless-observed': 'wifi_association_inferred',
+    wireless_associated: 'wifi_association_inferred',
+    wireless_observed: 'wifi_association_inferred',
     ap_bridge_inferred: 'ap_bridge_inferred',
+    'reported-by-ap': 'ap_bridge_inferred',
+    reported_by_ap: 'ap_bridge_inferred',
     gateway_default: 'gateway_default',
     default_gateway: 'gateway_default',
     default_gateway_route: 'gateway_default',
+    'gateway-link': 'gateway_default',
+    gateway_link: 'gateway_default',
     upstream_private_gateway: 'upstream_private_gateway',
     upstream_nat: 'upstream_private_gateway',
     possible_cpe_path: 'upstream_private_gateway',
@@ -391,9 +530,21 @@ function edgeType(value: string | null): TopologyEdge['type'] {
     route_hop: 'route_hop',
     traceroute_hop: 'route_hop',
     gateway_chain: 'route_hop',
+    'reported-by-router': 'route_hop',
+    reported_by_router: 'route_hop',
+    'weak-inferred': 'route_hop',
+    weak_inferred: 'route_hop',
     isp_route_hop: 'route_hop',
     nat_boundary: 'nat_boundary',
     isp_boundary: 'isp_boundary',
+    'subnet-inferred': 'same_subnet',
+    'arp-neighbor': 'arp_confirmed',
+    'switch-uplink': 'snmp_bridge_confirmed',
+    switch_uplink: 'snmp_bridge_confirmed',
+    'mesh-backhaul': 'wifi_association_inferred',
+    mesh_backhaul: 'wifi_association_inferred',
+    'repeater-uplink': 'ap_bridge_inferred',
+    repeater_uplink: 'ap_bridge_inferred',
     unknown_link: 'unknown_l2_connection',
     unknown_l2_connection: 'unknown_l2_connection',
   };
@@ -432,9 +583,9 @@ function edgeTarget(edge: Record<string, unknown>, lookup: Map<string, string>) 
 }
 
 function edgeLayer(edge: Record<string, unknown>): string | null {
-  const explicit = str(edge.layer) ?? str(edge.tier);
+  const explicit = str(edge.layer) ?? str(edge.tier) ?? str(edge.medium);
   if (explicit) return explicit;
-  const kind = `${edge.type ?? ''} ${edge.relationship ?? ''}`.toLowerCase();
+  const kind = `${edge.type ?? ''} ${edge.relationship ?? ''} ${edge.relation ?? ''}`.toLowerCase();
   if (kind.includes('l2') || kind.includes('subnet') || kind.includes('arp') || kind.includes('lldp') || kind.includes('cdp') || kind.includes('snmp')) return 'L2';
   if (kind.includes('nat')) return 'NAT';
   if (kind.includes('isp')) return 'ISP';
@@ -445,10 +596,14 @@ function normalizeEdges(rawEdges: Record<string, unknown>[], lookup: Map<string,
   return rawEdges.map((edge, index) => {
     const physical = edge.physical === true;
     const rawLineStyle = (str(edge.ui_line_style) ?? str(edge.line_style) ?? '').toLowerCase();
-    const lineStyle: TopologyEdge['lineStyle'] = physical ? 'solid' : rawLineStyle === 'dashed' ? 'dashed' : 'dotted';
+    const rawType = (str(edge.type) ?? str(edge.relationship) ?? '').toLowerCase();
+    const strongEvidence = ['reported-by-router', 'reported-by-ap', 'wireless-associated', 'switch-uplink'].includes(rawType);
+    const weakEvidence = rawType === 'weak-inferred' || clamp01(edge.confidence, 0) < 0.4;
+    const lineStyle: TopologyEdge['lineStyle'] =
+      physical || strongEvidence ? 'solid' : rawLineStyle === 'dashed' ? 'dashed' : weakEvidence ? 'dotted' : 'dashed';
     const tier = edgeTier(edgeLayer(edge));
     const type = edgeType(str(edge.type) ?? str(edge.relationship));
-    const certainty: TopologyEdge['certainty'] = physical ? 'confirmed' : lineStyle === 'dotted' ? 'unknown' : 'inferred';
+    const certainty: TopologyEdge['certainty'] = physical || strongEvidence ? 'confirmed' : lineStyle === 'dotted' ? 'unknown' : 'inferred';
     const boundary: TopologyEdge['boundary'] = tier === 'nat' ? 'NAT' : tier === 'isp' ? 'ISP' : null;
     return {
       id: str(edge.id) ?? `edge-${index}`,
@@ -458,7 +613,7 @@ function normalizeEdges(rawEdges: Record<string, unknown>[], lookup: Map<string,
       certainty,
       tier,
       confidence: clamp01(edge.confidence, physical ? 1 : 0.3),
-      label: str(edge.relationship) ?? str(edge.type) ?? 'link',
+      label: str(edge.relationship) ?? str(edge.relation) ?? str(edge.type) ?? 'link',
       basis: str(edge.proof_source) ?? str(edge.reason) ?? 'iad-agent',
       boundary,
       thin: type === 'route_hop',
@@ -468,30 +623,50 @@ function normalizeEdges(rawEdges: Record<string, unknown>[], lookup: Map<string,
       layers: [tier],
       // Extra detail surfaced in the edge inspector (TopologyEdge has an index
       // signature, so these ride along without widening the declared shape).
-      relationship: str(edge.relationship),
+      relationship: str(edge.relationship) ?? str(edge.relation),
+      relation: str(edge.relation) ?? str(edge.relationship),
+      medium: str(edge.medium) ?? tier,
+      explanation: str(edge.explanation) ?? str(edge.reason),
+      warnings: arr<string>(edge.warnings),
+      evidence: arr<Record<string, unknown>>(edge.evidence),
       proofSource: str(edge.proof_source),
       reason: str(edge.reason),
       confidenceLabel: str(edge.confidence_label),
       evidenceIds: arr<string>(edge.evidence_ids),
+      rawEdge: edge,
     };
   }).filter((edge) => edge.source && edge.target && edge.source !== edge.target);
+}
+
+function deviceBadge(device: NetworkDevice | undefined): string | null {
+  if (!device) return null;
+  if (device.isGateway) return 'Gateway';
+  if (device.isAgent) return 'Local';
+  if (device.roles.some((role) => role.toLowerCase() === 'upstream_private_gateway' || role.toLowerCase() === 'possible_cpe')) {
+    return 'Upstream';
+  }
+  if (device.isUnknown) return 'Unknown';
+  return null;
 }
 
 function normalizeTopology(raw: RawScanReport, devices: NetworkDevice[]): TopologyViewModel {
   const topology = rec(raw.topology);
   const topologyGraph = rec(topology.graph);
+  const richTopology = rec(raw.rich_topology);
   const uiGraph = rec(rec(raw.ui).graph);
   const deviceIntel = rec(raw.device_intel);
   const lookup = endpointLookup(devices);
   const sourceNodes = [
     ...arr<Record<string, unknown>>(topology.nodes),
     ...arr<Record<string, unknown>>(topologyGraph.nodes),
+    ...arr<Record<string, unknown>>(richTopology.nodes),
     ...arr<Record<string, unknown>>(uiGraph.nodes),
   ];
   const sourceEdges = [
     ...((raw.edges ?? []) as RawEdge[]),
     ...arr<Record<string, unknown>>(topology.edges),
     ...arr<Record<string, unknown>>(topologyGraph.edges),
+    ...arr<Record<string, unknown>>(richTopology.edges),
     ...arr<Record<string, unknown>>(uiGraph.edges),
     ...arr<Record<string, unknown>>(deviceIntel.edges),
   ].filter((edge, index, all) => {
@@ -503,15 +678,14 @@ function normalizeTopology(raw: RawScanReport, devices: NetworkDevice[]): Topolo
       return otherKey === key;
     }) === index;
   }) as Record<string, unknown>[];
-  const edges = normalizeEdges(sourceEdges, lookup);
 
   const nodeIdFor = (node: Record<string, unknown>) =>
     normalizeEndpoint(node.id ?? node.device_id ?? node.deviceId ?? node.ip ?? rec(node.metadata).device_id, lookup);
   const nodeIds = new Set<string>([
     ...devices.map((device) => device.id),
     ...sourceNodes.map(nodeIdFor),
-    ...edges.flatMap((edge) => [edge.source, edge.target]),
   ]);
+  const edges = normalizeEdges(sourceEdges, lookup).filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target));
 
   const nodes: TopologyNode[] = Array.from(nodeIds).filter(Boolean).map((id, index) => {
     const device = devices.find((item) => item.id === id);
@@ -520,6 +694,10 @@ function normalizeTopology(raw: RawScanReport, devices: NetworkDevice[]): Topolo
     const type = device?.type ?? mapNodeType(str(uiNode.type) ?? str(uiNode.device_type), arr<string>(uiNode.roles));
     const inferred = bool(uiNode.inferred, false);
     const secondaryHostname = device ? deviceSecondaryHostname(device) : null;
+    const nodeMobileFingerprint = device?.mobileFingerprint ?? normalizeMobileFingerprint(uiNode.mobileFingerprint ?? uiNode.mobile_fingerprint);
+    const nodeOSHint = device?.osHint ?? (uiNode.osHint || uiNode.os_hint ? normalizeOSHint(uiNode.osHint ?? uiNode.os_hint) : osHintFromClassification(nodeMobileFingerprint?.classification));
+    const nodeDeviceTypeHint = device?.deviceTypeHint ?? (uiNode.deviceTypeHint || uiNode.device_type_hint ? normalizeDeviceTypeHint(uiNode.deviceTypeHint ?? uiNode.device_type_hint) : null);
+    const nodeOSEvidenceSummary = device?.osEvidenceSummary ?? arr<string>(uiNode.osEvidenceSummary ?? uiNode.os_evidence_summary);
     return {
       id,
       type,
@@ -527,7 +705,7 @@ function normalizeTopology(raw: RawScanReport, devices: NetworkDevice[]): Topolo
       sublabel: device?.ip ?? (str(uiNode.label) === label ? null : str(uiNode.label)),
       certainty: inferred ? 'inferred' : 'confirmed',
       layers: ['l3'],
-      badge: device?.isGateway ? 'Gateway' : device?.isAgent ? 'Local' : device?.isUnknown ? 'Unknown' : null,
+      badge: deviceBadge(device),
       deviceId: device?.id ?? null,
       accent: Boolean(device?.isGateway || device?.isAgent),
       position: { x: 80 + (index % 4) * 230, y: 70 + Math.floor(index / 4) * 150 },
@@ -537,6 +715,17 @@ function normalizeTopology(raw: RawScanReport, devices: NetworkDevice[]): Topolo
       isAgent: device?.isAgent ?? false,
       isUnknown: device?.isUnknown ?? false,
       ip: device?.ip ?? null,
+      mac: device?.mac ?? null,
+      vendor: device?.vendor ?? null,
+      role: device?.role ?? null,
+      evidenceCount: device?.evidenceCount ?? arr<Record<string, unknown>>(uiNode.evidence).length,
+      wireless: device?.wireless ?? (Object.keys(rec(uiNode.wireless)).length ? rec(uiNode.wireless) : null),
+      rawSources: device?.rawSources ?? arr<string>(uiNode.raw_sources),
+      mobileFingerprint: nodeMobileFingerprint,
+      deviceTypeHint: nodeDeviceTypeHint,
+      osHint: nodeOSHint,
+      osConfidence: device?.osConfidence ?? num(uiNode.osConfidence ?? uiNode.os_confidence) ?? nodeMobileFingerprint?.confidence ?? null,
+      osEvidenceSummary: nodeOSEvidenceSummary,
       hostname: secondaryHostname,
       reachability: device?.reachability ?? 'unknown',
       discoverySources: device?.discoverySources ?? [],

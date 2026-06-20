@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { validateScanJson } from './scan-schema';
 import { useScanStore } from '../store/useScanStore';
 import { wailsBridge, type ScanMode } from './api/AgentBridge';
+import { startScan } from './scan-controller';
 
 export interface ImportError {
   path: string;
@@ -27,7 +28,6 @@ function pickJsonFile(): Promise<string | null> {
 
 export function useImport() {
   const setReport = useScanStore((state) => state.setReport);
-  const setScanning = useScanStore((state) => state.setScanning);
   const setScanError = useScanStore((state) => state.setScanError);
   const [errors, setErrors] = useState<ImportError[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -57,31 +57,19 @@ export function useImport() {
     }
   }, [loadText]);
 
-  const runAgent = useCallback(async (mode: ScanMode = 'standard', iface = '') => {
+  // Delegates to the non-blocking, event-driven scan controller so the existing
+  // "Run Scan" buttons keep the live dashboard visible instead of blocking. The
+  // controller owns the lifecycle/status; this just kicks it off.
+  const runAgent = useCallback(async (mode: ScanMode = 'full', iface = '') => {
     setBusy(true);
     setErrors(null);
     setScanError(null);
-    setScanning(true);
     try {
-      const text = await wailsBridge.runScan(mode, iface);
-      if (text) {
-        if (!loadText(text, 'agent')) {
-          setScanError('Scan output failed validation — see details below.');
-        }
-      } else {
-        const msg = 'Agent returned no output. Is iad-agent installed next to the app?';
-        setErrors([{ path: '(agent)', message: msg }]);
-        setScanError(msg);
-      }
-    } catch (error) {
-      const msg = (error as Error).message;
-      setErrors([{ path: '(agent)', message: msg }]);
-      setScanError(msg);
+      await startScan(mode, iface);
     } finally {
       setBusy(false);
-      setScanning(false);
     }
-  }, [loadText, setScanning, setScanError]);
+  }, [setScanError]);
 
   return {
     busy,
